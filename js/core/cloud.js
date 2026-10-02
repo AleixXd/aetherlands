@@ -9,6 +9,7 @@ const CloudSave = {
   session: null,      // { access_token, refresh_token, expires_at, email }
   _t: null,           // temporizador de subida automática
   _busy: false,
+  _netWarned: false,  // aviso de red mostrado (una sola vez hasta que se suba)
 
   enabled() {
     return !!(CFG.CLOUD && CFG.CLOUD.URL && CFG.CLOUD.ANON);
@@ -119,6 +120,13 @@ const CloudSave = {
     return { data: JSON.parse(meta.save), saveAt: meta.saveAt || 0 };
   },
 
+  /* ---------- avisos de red ---------- */
+  _warn(msg) {
+    if (this._netWarned) return;
+    this._netWarned = true;
+    if (typeof Game !== "undefined" && Game.ui && Game.ui.notify) Game.ui.notify(msg, "warn");
+  },
+
   /* ---------- subida automática (tras Save.save) ---------- */
   scheduleUpload() {
     if (!this.enabled()) return;
@@ -126,10 +134,27 @@ const CloudSave = {
     if (this._busy) return;
     clearTimeout(this._t);
     this._t = setTimeout(() => {
+      if (typeof navigator !== "undefined" && navigator.onLine === false) {
+        this._warn("Sin conexión: la partida se subirá sola al volver la red.");
+        return;
+      }
       this._busy = true;
       this.upload(JSON.stringify(Save.data)).then(() => {
         this.lastUp = Date.now();
-      }).catch(() => {}).finally(() => { this._busy = false; });
+        this._netWarned = false;
+      }).catch((e) => {
+        const offline = typeof navigator !== "undefined" && navigator.onLine === false;
+        if (offline || /fetch|network/i.test(e.message || "")) {
+          this._warn("Sin conexión: la partida se subirá sola al volver la red.");
+        } else {
+          this._warn("No se pudo subir a la nube: " + e.message);
+        }
+      }).finally(() => { this._busy = false; });
     }, 3000);
   }
 };
+
+/* reintento automático al recuperar la conexión */
+if (typeof window !== "undefined") {
+  window.addEventListener("online", function () { CloudSave.scheduleUpload(); });
+}

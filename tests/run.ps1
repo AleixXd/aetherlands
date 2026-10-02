@@ -57,6 +57,8 @@ foreach ($f in @($errFile, $outFile, $png, $srvOut)) { if (Test-Path $f) { Remov
 if (Test-Path $prof) { Remove-Item -Recurse -Force $prof }
 # solo mata instancias headless de ESTA suite (no el Chrome del usuario)
 Get-CimInstance Win32_Process -Filter "Name='chrome.exe'" | Where-Object { $_.CommandLine -match 'autotest_prof' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+# libera el puerto si quedo un servidor zombi de una ejecucion anterior
+Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }
 $srv = Start-Process -FilePath "powershell.exe" -ArgumentList "-NoProfile","-ExecutionPolicy","Bypass","-File","`"$PSScriptRoot\server.ps1`"","-Port","$Port" -RedirectStandardOutput $srvOut -RedirectStandardError (Join-Path $tmp "autotest_srv_err.txt") -WindowStyle Hidden -PassThru
 $up = $false
 for ($i = 0; $i -lt 20 -and -not $up; $i++) {
@@ -73,6 +75,9 @@ if ($up) {
   while (!$p.HasExited -and $w -lt $WaitSec) {
     Start-Sleep -Seconds 1; $w++
     try { if ((Get-Content $errFile -Raw -ErrorAction Stop) -match '\[TEST\]\s+FIN') { $finSeen = $true; break } } catch {}
+  }
+  if (!$finSeen -and (Test-Path $errFile)) {
+    try { if ((Get-Content $errFile -Raw -ErrorAction Stop) -match '\[TEST\]\s+FIN') { $finSeen = $true } } catch {}
   }
   if ($finSeen) { Start-Sleep -Seconds 4 }
   if (!$p.HasExited) { Stop-Process -Id $p.Id -Force }

@@ -1,5 +1,5 @@
 /* Aetherlands — Service Worker: offline + actualización en segundo plano */
-const CACHE = "aetherlands-v1";
+const CACHE = "aetherlands-v2";
 const FILES = [
   "./",
   "./index.html",
@@ -15,7 +15,6 @@ const FILES = [
   "./js/core/sound.js",
   "./js/core/save.js",
   "./js/core/cloud.js",
-  "./js/core/manual.js",
   "./js/core/settings.js",
   "./js/postfx.js",
   "./js/world.js",

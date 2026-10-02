@@ -18,6 +18,7 @@ const UI = {
   _shopCtx: null,         // {kind:'shop'|'mounts'|'trade'|'quests', npc}
   _lastHint: "",
   _delArmed: false,
+  _accArm: null,
 
   $(id) { return document.getElementById(id); },
 
@@ -97,13 +98,13 @@ const UI = {
       else if (act === "close-load") this.hideLoad();
       else if (act === "menu-play") this._menuPlay();
       else if (act === "menu-load") this.showLoad();
-    else if (act === "menu-account") this.showAccount();
-    else if (act === "close-account") this.hideAccount();
-    else if (act === "acc-login") this._accAuth(false);
-    else if (act === "acc-signup") this._accAuth(true);
-    else if (act === "acc-up") this._accUp();
-    else if (act === "acc-down") this._accDown();
-    else if (act === "acc-out") this._accOut();
+      else if (act === "menu-account") this.showAccount();
+      else if (act === "close-account") this.hideAccount();
+      else if (act === "acc-login") this._accAuth(false);
+      else if (act === "acc-signup") this._accAuth(true);
+      else if (act === "acc-up") this._accUp();
+      else if (act === "acc-down") this._accDown();
+      else if (act === "acc-out") this._accOut();
       else if (act === "menu-settings") this.openSettings();
       else if (act === "menu-controls") this.showControls();
       else if (act === "menu-quit") this.showQuit();
@@ -121,7 +122,6 @@ const UI = {
       else if (act === "restart") { this.game.restart(); this.togglePause(false); }
       else if (act === "export") { Save.exportFile(); this.notify("Guardado exportado.", "good"); }
       else if (act === "settings") this.openSettings();
-      else if (act === "manual") this._downloadManual();
       else if (act === "set-toggle") { Settings.set(ds.key, !Settings.s[ds.key]); this.renderSettings(); }
       else if (act === "set-quality") { Settings.set("quality", ds.v); this.renderSettings(); }
       else if (act === "set-reset") { Settings.reset(); this.renderSettings(); this.notify("Ajustes restaurados.", "good"); }
@@ -381,23 +381,6 @@ const UI = {
     });
   },
 
-  _downloadManual() {
-    try {
-      const text = (typeof MANUAL_TEXT !== "undefined") ? MANUAL_TEXT : "";
-      if (!text) { this.notify("Manual no disponible.", "warn"); return; }
-      const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "Aetherlands_Manual.txt";
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 4000);
-      this.notify("Manual descargado: Aetherlands_Manual.txt", "good");
-    } catch (e) { this.notify("No se pudo descargar el manual.", "warn"); }
-  },
-
   /* ---------- stats ---------- */
   toggleStats(force) {
     if (this.menuOpen) return;
@@ -633,12 +616,14 @@ const UI = {
 
   /* ---------- cuenta y guardado en la nube ---------- */
   showAccount() {
+    this._accArm = null;
     this.renderAccount();
     if (this.els.accountPanel) this.els.accountPanel.classList.remove("hidden");
     if (typeof Input !== "undefined") Input.exitLock();
   },
 
   hideAccount() {
+    this._accArm = null;
     if (this.els.accountPanel) this.els.accountPanel.classList.add("hidden");
   },
 
@@ -662,11 +647,13 @@ const UI = {
         "<button data-act='acc-signup' class='btn-big btn-alt'>CREAR CUENTA</button>" +
         "</div>";
     } else {
+      const upTxt = this._accArm === "up" ? "¿SEGURO? SUSTITUIR LA NUBE" : "SUBIR PARTIDA";
+      const downTxt = this._accArm === "down" ? "¿SEGURO? SUSTITUIR LA LOCAL" : "CARGAR PARTIDA DE LA NUBE";
       el.innerHTML =
         "<div class='acc-session'>Sesión iniciada: <b>" + s.email + "</b></div>" +
         "<div class='acc-form'>" +
-        "<button data-act='acc-up' class='btn-big primary'>SUBIR PARTIDA</button>" +
-        "<button data-act='acc-down' class='btn-big btn-alt'>CARGAR PARTIDA DE LA NUBE</button>" +
+        "<button data-act='acc-up' class='btn-big primary'>" + upTxt + "</button>" +
+        "<button data-act='acc-down' class='btn-big btn-alt'>" + downTxt + "</button>" +
         "<button data-act='acc-out' class='btn-big btn-ghost'>CERRAR SESIÓN</button>" +
         "</div>";
     }
@@ -682,32 +669,51 @@ const UI = {
       this.notify(signup ? "¡Cuenta creada! Sesión iniciada." : "Sesión iniciada.", "good");
       try {
         const cloud = await CloudSave.download();
-        if (cloud && cloud.saveAt) this.notify("Hay una partida en la nube (" + new Date(cloud.saveAt).toLocaleString("es-ES") + ").", "info");
+        if (cloud && cloud.saveAt) this.notify("Hay una partida en la nube (" + new Date(cloud.saveAt).toLocaleString("es-ES") + "). Puedes cargarla con CARGAR PARTIDA DE LA NUBE.", "info");
       } catch (e) {}
+      this._accArm = null;
       this.renderAccount();
     } catch (e) { this.notify(e.message, "warn"); }
   },
 
   async _accUp() {
+    if (this._accArm !== "up") {
+      this._accArm = "up";
+      this.renderAccount();
+      this.notify("Pulsa otra vez para sustituir la partida de la nube.", "warn");
+      setTimeout(() => { if (this._accArm === "up") { this._accArm = null; this.renderAccount(); } }, 4000);
+      return;
+    }
+    this._accArm = null;
     try {
       await CloudSave.upload(Save.exportJSON());
       this.notify("Partida subida a la nube.", "good");
     } catch (e) { this.notify("No se pudo subir: " + e.message, "warn"); }
+    this.renderAccount();
   },
 
   async _accDown() {
+    if (this._accArm !== "down") {
+      this._accArm = "down";
+      this.renderAccount();
+      this.notify("Pulsa otra vez para sustituir tu partida local.", "warn");
+      setTimeout(() => { if (this._accArm === "down") { this._accArm = null; this.renderAccount(); } }, 4000);
+      return;
+    }
+    this._accArm = null;
     try {
       const cloud = await CloudSave.download();
-      if (!cloud) { this.notify("No hay ninguna partida en la nube.", "warn"); return; }
-      if (!Save.importJSON(JSON.stringify(cloud.data))) { this.notify("La partida de la nube está dañada.", "warn"); return; }
+      if (!cloud) { this.notify("No hay ninguna partida en la nube.", "warn"); this.renderAccount(); return; }
+      if (!Save.importJSON(JSON.stringify(cloud.data))) { this.notify("La partida de la nube está dañada.", "warn"); this.renderAccount(); return; }
       this.notify("Partida cargada de la nube. Recargando...", "good");
       setTimeout(() => location.reload(), 900);
-    } catch (e) { this.notify("No se pudo cargar: " + e.message, "warn"); }
+    } catch (e) { this.notify("No se pudo cargar: " + e.message, "warn"); this.renderAccount(); }
   },
 
   async _accOut() {
     try { await CloudSave.logout(); } catch (e) {}
     this.notify("Sesión cerrada.", "info");
+    this._accArm = null;
     this.renderAccount();
   },
 
