@@ -1,0 +1,179 @@
+﻿<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>AERH - Aetherlands: El auge de la Aguja de Veranth</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div id="app">
+    <canvas id="game-canvas"></canvas>
+    <div id="hud"></div>
+    <div id="minimap-wrap"><canvas id="minimap" width="156" height="156"></canvas></div>
+    <div id="toastbox"></div>
+    <div id="nameplates"></div>
+    <div id="interact-hint" class="hidden"><kbd>E</kbd><span id="interact-text"></span></div>
+    <div id="questpop" class="hidden"><span id="questpop-title"></span><span id="questpop-desc"></span></div>
+
+    <div id="questlog-panel" class="panel hidden">
+      <div class="panel-head">LOG DE MISIONES <button data-act="close-quests" class="btn-small">x</button></div>
+      <div id="questlog-body"></div>
+    </div>
+    <div id="stats-panel" class="panel hidden">
+      <div class="panel-head">PERSONAJE <span id="stat-name"></span> <button data-act="close-stats" class="btn-small">x</button></div>
+      <div id="stats-body"></div>
+    </div>
+    <div id="shop-panel" class="panel hidden">
+      <div class="panel-head"><span id="shop-title-text">TIENDA</span><button data-act="close-shop" class="btn-small">x</button></div>
+      <div id="shop-body"></div>
+    </div>
+    <div id="gacha-panel" class="panel hidden">
+      <div class="panel-head">SALA DE AVENTURAS <button data-act="close-gacha" class="btn-small">x</button></div>
+      <div id="gacha-body"></div>
+    </div>
+    <div id="pvp-panel" class="panel hidden">
+      <div class="panel-head">ARENA <button data-act="close-pvp" class="btn-small">x</button></div>
+      <div id="pvp-body"></div>
+    </div>
+    <div id="settings-panel" class="panel hidden">
+      <div class="panel-head">AJUSTES <button data-act="close-settings" class="btn-small">x</button></div>
+      <div id="settings-body"></div>
+    </div>
+    <div id="death-panel" class="hidden">
+      <h2>¡Has caído!</h2>
+      <p id="death-reason"></p>
+      <div class="death-row">
+        <button data-act="respawn" class="btn-big">REAPARECER</button>
+      </div>
+    </div>
+
+    <div id="pause-panel" class="overlay hidden">
+      <div class="ov-frame">
+        <div class="ov-orn"><span>◆</span></div>
+        <h2>Pausa</h2>
+        <div class="pause-cols">
+          <div class="pause-main">
+            <button data-act="resume" class="btn-big primary">CONTINUAR</button>
+            <button data-act="settings" class="btn-big btn-alt">AJUSTES</button>
+            <button data-act="controls" class="btn-big btn-alt">CONTROLES</button>
+          </div>
+          <div class="pause-sec">
+            <button data-act="manual" class="btn-big btn-ghost">DESCARGAR MANUAL</button>
+            <button data-act="export" class="btn-big btn-ghost">EXPORTAR GUARDADO</button>
+            <button data-act="restart" class="btn-big btn-ghost">REINICIAR MUNDO</button>
+            <button data-act="menu" class="btn-big btn-ghost">MENÚ PRINCIPAL</button>
+          </div>
+        </div>
+        <p class="ov-hint">Clic para capturar el ratón · WASD moverse · Espacio saltar · Shift dash · E interactuar</p>
+      </div>
+    </div>
+
+    <div id="class-select" class="overlay hidden">
+      <div class="ov-frame">
+        <div class="ov-orn"><span>◆</span></div>
+        <h2>Elige tu clase</h2>
+        <p>Cada camino tiene sus propias habilidades. Despertarás en Aetherlands.</p>
+        <div id="class-cards"></div>
+        <button data-act="class-back" class="btn-big btn-ghost class-back-btn">VOLVER AL MENÚ</button>
+      </div>
+    </div>
+
+    <div id="mainmenu" class="overlay menu-screen hidden">
+      <div class="menu-frame">
+        <div class="menu-eyebrow">RPG 3D · MUNDO ABIERTO</div>
+        <div class="menu-title-wrap">
+          <div class="menu-rule left"></div>
+          <h1 class="game-title">ÉTERLANDS</h1>
+          <div class="menu-rule right"></div>
+        </div>
+        <div class="game-sub">EL AUGE DE LA AGUJA DE VERANTH</div>
+        <div class="menu-buttons">
+          <button data-act="menu-play" class="btn-menu primary" id="menu-play">
+            JUGAR<span class="btn-sub" id="menu-play-sub">Nueva partida</span>
+          </button>
+          <button data-act="menu-load" class="btn-menu" id="menu-load">CARGAR PARTIDA</button>
+          <div class="menu-div"><span>◆</span></div>
+          <div class="menu-row">
+            <button data-act="menu-settings" class="btn-menu minor">OPCIONES</button>
+            <button data-act="menu-controls" class="btn-menu minor">CONTROLES</button>
+          </div>
+          <button data-act="menu-quit" class="btn-menu minor ghost">SALIR</button>
+        </div>
+        <div class="menu-foot">v1.0 · Guardado automático en tu navegador</div>
+      </div>
+    </div>
+
+    <div id="controls-panel" class="overlay ctrl-screen hidden">
+      <div class="ov-frame panel-frame">
+        <div class="panel-head">CONTROLES <button data-act="close-controls" class="btn-small">✕</button></div>
+        <div id="controls-body"></div>
+        <div class="ctrl-foot">
+          <button data-act="manual" class="btn-big btn-ghost">DESCARGAR MANUAL COMPLETO</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="load-panel" class="overlay hidden">
+      <div class="ov-frame panel-frame">
+        <div class="panel-head">CARGAR PARTIDA <button data-act="close-load" class="btn-small">✕</button></div>
+        <div id="load-body"></div>
+        <div class="load-actions">
+          <button data-act="load-do" class="btn-big primary">CARGAR</button>
+          <button data-act="load-del" class="btn-big btn-danger" id="load-del-btn">BORRAR GUARDADO</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="quit-screen" class="overlay quit-screen hidden">
+      <div class="ov-frame">
+        <div class="ov-orn"><span>◆</span></div>
+        <h1 class="game-title small">HASTA LA PRÓXIMA</h1>
+        <p>Gracias por jugar a Éterlands.<br>Tu partida queda guardada en este navegador.</p>
+        <button data-act="quit-back" class="btn-menu primary">VOLVER AL MENÚ</button>
+      </div>
+    </div>
+
+    <div id="boot-note" class="boot-note">Iniciando Aetherlands...</div>
+  </div>
+
+  <div id="hud-tpl">
+    <div class="hud-bar hp"><label>VIDA</label><div class="bar"><div class="fill hp-fill" id="hp-fill"></div></div><span class="num" id="hp-num">100/100</span></div>
+    <div class="hud-bar stam"><label>RESIST</label><div class="bar"><div class="fill stam-fill" id="stam-fill"></div></div><span class="num" id="stam-num">100/100</span></div>
+    <div class="hud-bar xp"><label>XP</label><div class="bar"><div class="fill xp-fill" id="xp-fill"></div></div><span class="num" id="xp-num">0</span></div>
+    <div class="hud-side">
+      <span class="res" id="gold-res">0g</span>
+      <span class="res" id="crystal-res">0c</span>
+      <span class="lvl" id="lvl-res">N1</span>
+      <button class="btn-hud" data-act="stats">i</button>
+      <button class="btn-hud" data-act="quests">!</button>
+    </div>
+    <div class="stam-warn" id="stam-warn">SIN AIRE</div>
+  </div>
+
+  <script src="js/lib/three.min.js"></script>
+  <!-- core -->
+  <script src="js/core/config.js"></script>
+  <script src="js/core/utils.js"></script>
+  <script src="js/core/data.js"></script>
+  <script src="js/core/input.js"></script>
+  <script src="js/core/sound.js"></script>
+  <script src="js/core/save.js"></script>
+  <script src="js/core/manual.js"></script>
+  <script src="js/core/settings.js"></script>
+  <script src="js/postfx.js"></script>
+  <!-- world -->
+  <script src="js/world.js"></script>
+  <script src="js/build.js"></script>
+  <script src="js/effects.js"></script>
+  <script src="js/enemies.js"></script>
+  <script src="js/inventory.js"></script>
+  <script src="js/quests.js"></script>
+  <script src="js/caves.js"></script>
+  <script src="js/castle.js"></script>
+  <!-- player + systems -->
+  <script src="js/player.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/game.js"></script>
+</body>
+</html>
