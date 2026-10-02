@@ -1,0 +1,16 @@
+{
+  "name": "AERH — Aetherlands: El auge de la Aguja de Veranth",
+  "short_name": "AERH",
+  "lang": "es",
+  "description": "RPG 3D de mundo abierto en el navegador: explora Aetherlands, sube de nivel, completa misiones y encara jefes, mazmorras y arenas.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0f0c16",
+  "theme_color": "#0f0c16",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

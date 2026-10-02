@@ -5,6 +5,11 @@
 const CFG = {
   VERSION: "1.0.0",
   SAVE_KEY: "ael_save_v1",
+  // Supabase (guardado en la nube) — clave ANON pública, protegida por RLS/escritura propia
+  CLOUD: {
+    URL: "https://rvuxfeyofnecxxgzvtyw.supabase.co",
+    ANON: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ2dXhmZXlvZm5lY3h4Z3p2dHl3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTA5NTQ2MTQsImV4cCI6MjEwNjUzMDYxNH0.QwHv4Mj_Eg2uinFC1CNZ9NtFk7QJoUBbwKGskHMCVsI"
+  },
 
   // World
   WORLD: {

@@ -488,3 +488,12 @@ body.in-menu #hud, body.in-menu #minimap-wrap, body.in-menu #interact-hint { dis
 .setbtns { display: flex; gap: 6px; }
 input[type=range] { flex: 1.4; accent-color: var(--gold); cursor: pointer; }
 .set-reset { padding: 10px 20px; font-size: 12px; }
+
+
+/* ---------- cuenta y nube ---------- */
+.acc-form { display: flex; flex-direction: column; gap: 10px; margin: 14px 0 4px; }
+.acc-form input { width: 100%; padding: 11px 13px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.14); border-radius: 6px; color: #e8ecf5; font-size: 14px; outline: none; box-sizing: border-box; font-family: inherit; }
+.acc-form input:focus { border-color: var(--gold); }
+.acc-form input::placeholder { color: #7b8194; }
+.acc-session { text-align: center; color: #a3a9b8; font-size: 13px; padding: 4px 0 2px; }
+.acc-session b { color: var(--gold-lt); }

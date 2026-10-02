@@ -76,6 +76,7 @@ const Save = {
     if (!this.data) return;
     this.data.updatedAt = Date.now();
     try { localStorage.setItem(this.key, JSON.stringify(this.data)); } catch (e) {}
+    if (typeof CloudSave !== "undefined") CloudSave.scheduleUpload();
   },
 
   wipe() {

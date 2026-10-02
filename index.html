@@ -4,6 +4,16 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <title>AERH - Aetherlands: El auge de la Aguja de Veranth</title>
+<meta name="description" content="RPG 3D de mundo abierto en el navegador: explora Aetherlands, sube de nivel, completa misiones y encara jefes, mazmorras y arenas.">
+<meta name="theme-color" content="#0f0c16">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta property="og:title" content="AERH - Aetherlands: El auge de la Aguja de Veranth">
+<meta property="og:description" content="RPG 3D de mundo abierto que corre en tu navegador.">
+<meta property="og:type" content="website">
+<meta property="og:image" content="https://aleixxd.github.io/aetherlands/icon-512.png">
+<meta name="twitter:card" content="summary">
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -97,6 +107,7 @@
           <div class="menu-row">
             <button data-act="menu-settings" class="btn-menu minor">OPCIONES</button>
             <button data-act="menu-controls" class="btn-menu minor">CONTROLES</button>
+            <button data-act="menu-account" class="btn-menu minor">CUENTA</button>
           </div>
           <button data-act="menu-quit" class="btn-menu minor ghost">SALIR</button>
         </div>
@@ -122,6 +133,13 @@
           <button data-act="load-do" class="btn-big primary">CARGAR</button>
           <button data-act="load-del" class="btn-big btn-danger" id="load-del-btn">BORRAR GUARDADO</button>
         </div>
+      </div>
+    </div>
+
+    <div id="account-panel" class="overlay hidden">
+      <div class="ov-frame panel-frame">
+        <div class="panel-head">CUENTA Y NUBE <button data-act="close-account" class="btn-small">✕</button></div>
+        <div id="account-body"></div>
       </div>
     </div>
 
@@ -159,6 +177,7 @@
   <script src="js/core/input.js"></script>
   <script src="js/core/sound.js"></script>
   <script src="js/core/save.js"></script>
+  <script src="js/core/cloud.js"></script>
   <script src="js/core/manual.js"></script>
   <script src="js/core/settings.js"></script>
   <script src="js/postfx.js"></script>
@@ -175,5 +194,16 @@
   <script src="js/player.js"></script>
   <script src="js/ui.js"></script>
   <script src="js/game.js"></script>
+  <script>
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", function () {
+        navigator.serviceWorker.register("sw.js").then(function (r) {
+          console.log("[SW] registrado:", r.scope);
+        }).catch(function (e) {
+          console.warn("[SW] no disponible:", e.message);
+        });
+      });
+    }
+  </script>
 </body>
 </html>

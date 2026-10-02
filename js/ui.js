@@ -58,6 +58,8 @@ const UI = {
       loadPanel: this.$("load-panel"),
       loadBody: this.$("load-body"),
       loadDelBtn: this.$("load-del-btn"),
+      accountPanel: this.$("account-panel"),
+      accountBody: this.$("account-body"),
       quitScreen: this.$("quit-screen"),
     };
     this._cloneHud();
@@ -95,6 +97,13 @@ const UI = {
       else if (act === "close-load") this.hideLoad();
       else if (act === "menu-play") this._menuPlay();
       else if (act === "menu-load") this.showLoad();
+    else if (act === "menu-account") this.showAccount();
+    else if (act === "close-account") this.hideAccount();
+    else if (act === "acc-login") this._accAuth(false);
+    else if (act === "acc-signup") this._accAuth(true);
+    else if (act === "acc-up") this._accUp();
+    else if (act === "acc-down") this._accDown();
+    else if (act === "acc-out") this._accOut();
       else if (act === "menu-settings") this.openSettings();
       else if (act === "menu-controls") this.showControls();
       else if (act === "menu-quit") this.showQuit();
@@ -304,6 +313,7 @@ const UI = {
     if (this.menuOpen) return true;
     if (this.els.controlsPanel && !this.els.controlsPanel.classList.contains("hidden")) return true;
     if (this.els.loadPanel && !this.els.loadPanel.classList.contains("hidden")) return true;
+    if (this.els.accountPanel && !this.els.accountPanel.classList.contains("hidden")) return true;
     if (this.els.quitScreen && !this.els.quitScreen.classList.contains("hidden")) return true;
     return false;
   },
@@ -314,6 +324,7 @@ const UI = {
     if (this.deathVisible) return;                       // la muerte se responde con REAPARECER
     if (this.els.controlsPanel && !this.els.controlsPanel.classList.contains("hidden")) { this.hideControls(); return; }
     if (this.els.loadPanel && !this.els.loadPanel.classList.contains("hidden")) { this.hideLoad(); return; }
+    if (this.els.accountPanel && !this.els.accountPanel.classList.contains("hidden")) { this.hideAccount(); return; }
     if (this.els.quitScreen && !this.els.quitScreen.classList.contains("hidden")) { this.hideQuit(); return; }
     if (this.panelId) { this.closePanels(); return; }
     if (this.showingStats) { this.toggleStats(false); return; }
@@ -618,6 +629,86 @@ const UI = {
   hideLoad() {
     this._delArmed = false;
     if (this.els.loadPanel) this.els.loadPanel.classList.add("hidden");
+  },
+
+  /* ---------- cuenta y guardado en la nube ---------- */
+  showAccount() {
+    this.renderAccount();
+    if (this.els.accountPanel) this.els.accountPanel.classList.remove("hidden");
+    if (typeof Input !== "undefined") Input.exitLock();
+  },
+
+  hideAccount() {
+    if (this.els.accountPanel) this.els.accountPanel.classList.add("hidden");
+  },
+
+  renderAccount() {
+    const el = this.els.accountBody;
+    if (!el) return;
+    if (typeof CloudSave === "undefined" || !CloudSave.enabled()) {
+      el.innerHTML = "<div class='load-empty'>Guardado en la nube no disponible.</div>";
+      return;
+    }
+    const s = CloudSave.session || CloudSave._load();
+    if (!s) {
+      el.innerHTML =
+        "<div class='load-empty'>Inicia sesión para jugar desde cualquier equipo.<br>La partida se sube sola mientras juegas.</div>" +
+        "<div class='acc-form'>" +
+        "<input id='acc-email' type='email' placeholder='Correo electrónico' autocomplete='email'>" +
+        "<input id='acc-pass' type='password' placeholder='Contraseña (mínimo 6 caracteres)'>" +
+        "</div>" +
+        "<div class='load-actions'>" +
+        "<button data-act='acc-login' class='btn-big primary'>INICIAR SESIÓN</button>" +
+        "<button data-act='acc-signup' class='btn-big btn-alt'>CREAR CUENTA</button>" +
+        "</div>";
+    } else {
+      el.innerHTML =
+        "<div class='acc-session'>Sesión iniciada: <b>" + s.email + "</b></div>" +
+        "<div class='acc-form'>" +
+        "<button data-act='acc-up' class='btn-big primary'>SUBIR PARTIDA</button>" +
+        "<button data-act='acc-down' class='btn-big btn-alt'>CARGAR PARTIDA DE LA NUBE</button>" +
+        "<button data-act='acc-out' class='btn-big btn-ghost'>CERRAR SESIÓN</button>" +
+        "</div>";
+    }
+  },
+
+  async _accAuth(signup) {
+    const emEl = document.getElementById("acc-email"), pwEl = document.getElementById("acc-pass");
+    const em = emEl ? emEl.value.trim() : "", pw = pwEl ? pwEl.value : "";
+    if (!em || !pw) { this.notify("Correo y contraseña obligatorios.", "warn"); return; }
+    try {
+      if (signup) await CloudSave.signup(em, pw);
+      else await CloudSave.login(em, pw);
+      this.notify(signup ? "¡Cuenta creada! Sesión iniciada." : "Sesión iniciada.", "good");
+      try {
+        const cloud = await CloudSave.download();
+        if (cloud && cloud.saveAt) this.notify("Hay una partida en la nube (" + new Date(cloud.saveAt).toLocaleString("es-ES") + ").", "info");
+      } catch (e) {}
+      this.renderAccount();
+    } catch (e) { this.notify(e.message, "warn"); }
+  },
+
+  async _accUp() {
+    try {
+      await CloudSave.upload(Save.exportJSON());
+      this.notify("Partida subida a la nube.", "good");
+    } catch (e) { this.notify("No se pudo subir: " + e.message, "warn"); }
+  },
+
+  async _accDown() {
+    try {
+      const cloud = await CloudSave.download();
+      if (!cloud) { this.notify("No hay ninguna partida en la nube.", "warn"); return; }
+      if (!Save.importJSON(JSON.stringify(cloud.data))) { this.notify("La partida de la nube está dañada.", "warn"); return; }
+      this.notify("Partida cargada de la nube. Recargando...", "good");
+      setTimeout(() => location.reload(), 900);
+    } catch (e) { this.notify("No se pudo cargar: " + e.message, "warn"); }
+  },
+
+  async _accOut() {
+    try { await CloudSave.logout(); } catch (e) {}
+    this.notify("Sesión cerrada.", "info");
+    this.renderAccount();
   },
 
   _fmtDur(sec) {
