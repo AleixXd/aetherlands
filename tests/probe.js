@@ -106,19 +106,50 @@
   }
 
   function testPwa() {
-    return navigator.serviceWorker.getRegistration().then(function (reg) {
-      T("pwa: service worker", !!(reg && reg.active), "");
-      return caches.keys();
-    }).then(function (keys) {
-      if (!keys.length) { T("pwa: cache", false, "sin caches"); return; }
-      return caches.open(keys[0]).then(function (c) { return c.keys(); }).then(function (reqs) {
-        return fetch("sw.js").then(function (r) { return r.text(); }).then(function (txt) {
-          var block = txt.match(/const FILES = \[([\s\S]*?)\]/);
-          var declared = block ? (block[1].match(/"\.\//g) || []).length : -1;
-          T("pwa: cache completa", reqs.length === declared, "cache=" + reqs.length + " sw=" + declared);
+    return new Promise(function (resolve) {
+      var tries = 0, swOk = false;
+      var iv = setInterval(function () {
+        tries++;
+        navigator.serviceWorker.getRegistration().then(function (reg) {
+          if (reg && reg.active) swOk = true;
+        }).catch(function () {});
+        if (tries >= 120 && !swOk) {
+          clearInterval(iv);
+          T("pwa: service worker", false, "sin SW activo");
+          resolve();
+          return;
+        }
+        caches.keys().then(function (keys) {
+          if (!keys.length || !swOk) return null;
+          return caches.open(keys[0]).then(function (c) { return c.keys(); }).then(function (reqs) {
+            return fetch("sw.js").then(function (r) { return r.text(); }).then(function (txt) {
+              var block = txt.match(/const FILES = \[([\s\S]*?)\]/);
+              var declared = block ? (block[1].match(/"\.\/[^"]*"/g) || []) : [];
+              var paths = reqs.map(function (r) { return new URL(r.url).pathname; });
+              var missing = [];
+              for (var i = 0; i < declared.length; i++) {
+                var p = declared[i].replace(/^"\.\//, "").replace(/"$/, "");
+                var found;
+                if (p === "") found = paths.some(function (x) { return x.charAt(x.length - 1) === "/"; });
+                else found = paths.some(function (x) { return x === "/" + p || x.slice(-(p.length + 1)) === "/" + p; });
+                if (!found) missing.push(p);
+              }
+              if (missing.length === 0 || tries >= 120) {
+                clearInterval(iv);
+                T("pwa: service worker", true, "");
+                T("pwa: cache completa", missing.length === 0,
+                  "decl=" + declared.length + " cache=" + paths.length + " falta=" + (missing.join(",") || "-"));
+                resolve();
+              }
+            });
+          });
+        }).catch(function (e) {
+          clearInterval(iv);
+          T("pwa", false, e.message);
+          resolve();
         });
-      });
-    }).catch(function (e) { T("pwa", false, e.message); });
+      }, 50);
+    });
   }
 
   function testCloud() {
@@ -137,6 +168,26 @@
       .catch(function (e) { T("nube", false, e.message); });
   }
 
+  function testGlb() {
+    return new Promise(function (resolve) {
+      var tries = 0;
+      var iv = setInterval(function () {
+        tries++;
+        var p = (typeof Game !== "undefined" && Game.player) ? Game.player : null;
+        if (p && p.glbActive) {
+          clearInterval(iv);
+          T("personaje: glb", !!(p.mixer && p.clips && p.clips.Idle),
+            "clips=" + Object.keys(p.clips || {}).length);
+          resolve();
+        } else if (tries >= 120) {
+          clearInterval(iv);
+          T("personaje: glb", false, p ? "no carga (fallback procedural)" : "sin player");
+          resolve();
+        }
+      }, 50);
+    });
+  }
+
   function finish() {
     console.log("[TEST]\tFIN\ttotal=" + total + "\tfails=" + fails);
   }
@@ -150,7 +201,7 @@
         T("arranque: gameReady", true, "");
         try { testSave(); testCollisions(); testMinimap(); testAccount(); }
         catch (e) { T("suite", false, e.message); }
-        Promise.all([testPwa(), testCloud()]).then(finish);
+        Promise.all([testPwa(), testCloud(), testGlb()]).then(finish);
       } else if (tries >= 600) {
         clearInterval(iv);
         T("arranque: gameReady", false, "timeout");

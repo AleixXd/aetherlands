@@ -24,6 +24,11 @@ const Player = {
   timers: {},
   combo: 0, comboT: 0,
   anim: { t: 0, falling: 0 },
+  // personaje GLB (KayKit, esqueleto + AnimationMixer)
+  glbActive: false, mixer: null, clips: {},
+  _glbGen: 0, _glbCache: {}, _glbCur: null,
+  _glbOnce: null, _glbAttack: false, _glbDead: false,
+  _glbYawFix: Math.PI / 2,
 
   init(game) {
     this.game = game;
@@ -134,9 +139,144 @@ const Player = {
     g.position.copy(this.pos).y += 0;
     this.model = g;
     this.enableModel();
+    // GLB: se carga en segundo plano y sustituye al modelo procedural
+    this.glbActive = false;
+    this.mixer = null;
+    this.clips = {};
+    this._glbCur = null; this._glbOnce = null;
+    this._glbAttack = false; this._glbDead = false;
+    this._loadGLB();
   },
 
   enableModel(swordVisible) { this.model.visible = true; },
+
+  // ---------- personaje GLB animado (KayKit) ----------
+  _glbFileFor(cls) {
+    const map = { warrior: "knight", mage: "mage", rogue: "rogue", paladin: "knight" };
+    return map[cls.id] || "knight";
+  },
+
+  _loadGLB() {
+    const file = this._glbFileFor(this.classDef);
+    const gen = ++this._glbGen;
+    const start = () => {
+      if (gen !== this._glbGen || !window.GLTFLoader) return;
+      const cached = this._glbCache[file];
+      if (cached) { this._applyGLB(cached); return; }
+      const loader = new window.GLTFLoader();
+      loader.load("models/" + file + ".glb",
+        (gltf) => {
+          if (gen !== this._glbGen) return;
+          const entry = { root: gltf.scene, animations: gltf.animations || [] };
+          this._glbCache[file] = entry;
+          this._applyGLB(entry);
+        },
+        undefined,
+        (err) => { console.warn("[GLB] carga fallida:", file, err && (err.message || err)); });
+    };
+    if (window.GLTFLoader) start();
+    else window.addEventListener("gltfloader-ready", start, { once: true });
+  },
+
+  _applyGLB(entry) {
+    if (!this.model) return;
+    const root = entry.root;
+    // separa del grupo anterior para medir en coordenadas locales
+    // (setFromObject usa la matriz del padre sin actualizarla: si el root
+    //  queda parenteado entre usos, la caja sale en coordenadas de mundo)
+    if (root.parent) root.parent.remove(root);
+    root.scale.setScalar(1);
+    root.position.set(0, 0, 0);
+    const box = new THREE.Box3().setFromObject(root);
+    const h = (box.max.y - box.min.y) || 1.7;
+    const s = 1.85 / h;
+    root.scale.setScalar(s);
+    root.position.y = -box.min.y * s;
+    root.rotation.y = this._glbYawFix;
+    root.traverse((o) => {
+      if (o.isMesh || o.isSkinnedMesh) {
+        o.castShadow = true;
+        o.frustumCulled = false;
+      }
+    });
+    // quita el modelo procedural y coloca el GLB en su sitio
+    while (this.model.children.length) this.model.remove(this.model.children[0]);
+    this.model.add(root);
+    if (this.mixer) this.mixer.stopAllAction();
+    this.mixer = new THREE.AnimationMixer(root);
+    this.clips = {};
+    for (const c of entry.animations) this.clips[c.name] = c;
+    this._glbCur = null;
+    this._playGLB("Idle", 0);
+    this.glbActive = true;
+  },
+
+  _playGLB(name, fade) {
+    if (!this.mixer || !this.clips[name] || this._glbCur === name) return;
+    const next = this.mixer.clipAction(this.clips[name]);
+    next.enabled = true;
+    next.reset();
+    next.setLoop(THREE.LoopRepeat, Infinity);
+    if (this._glbCur && this.clips[this._glbCur]) this.mixer.clipAction(this.clips[this._glbCur]).fadeOut(fade);
+    next.fadeIn(fade).play();
+    this._glbCur = name;
+  },
+
+  _playGLBOnce(name) {
+    if (!this.mixer || !this.clips[name]) return;
+    const act = this.mixer.clipAction(this.clips[name]);
+    act.enabled = true;
+    act.reset();
+    act.setLoop(THREE.LoopOnce, 1);
+    act.clampWhenFinished = true;
+    if (this._glbCur && this.clips[this._glbCur]) this.mixer.clipAction(this.clips[this._glbCur]).fadeOut(0.08);
+    act.fadeIn(0.08).play();
+    this._glbOnce = { name, act };
+    this._glbCur = null;
+  },
+
+  _attackClipName() {
+    const w = this.classDef.weapon;
+    if (w === "staff" && this.clips["Spellcast_Shoot"]) return "Spellcast_Shoot";
+    if (w === "bow" && this.clips["1H_Ranged_Shoot"]) return "1H_Ranged_Shoot";
+    return this.clips["1H_Melee_Attack_Chop"] ? "1H_Melee_Attack_Chop" : "Idle";
+  },
+
+  _animateGLB(dt, moving, speed) {
+    if (this.swingT > 0) this.swingT -= dt;
+    // fin del one-shot en curso (ataque/muerte)
+    if (this._glbOnce) {
+      const a = this._glbOnce.act;
+      if (a.time >= a.getClip().duration - 0.04) {
+        a.fadeOut(0.12);
+        this._glbOnce = null;
+        this._glbCur = null;
+      }
+    }
+    // reaparición: cancela la animación de muerte
+    if (this._glbDead && !this.game.dead) {
+      this._glbDead = false;
+      if (this._glbOnce) { this._glbOnce.act.stop(); this._glbOnce = null; }
+      this._glbCur = null;
+    }
+    // ataque: borde de subida de swingT
+    if (this.swingT > 0 && !this._glbAttack) {
+      this._glbAttack = true;
+      this._playGLBOnce(this._attackClipName());
+    } else if (this.swingT <= 0) {
+      this._glbAttack = false;
+    }
+    // locomoción (mientras no haya one-shot)
+    if (!this._glbOnce && !this._glbDead) {
+      let want = "Idle";
+      if (!this.onGround && !this.riding) want = "Jump_Idle";
+      else if (moving && !this.riding) want = speed >= 7.5 ? "Running_A" : "Walking_A";
+      else if (this.blockHeld && this.clips["Blocking"]) want = "Blocking";
+      if (!this.clips[want]) want = "Idle";
+      this._playGLB(want, 0.18);
+    }
+    this.mixer.update(dt);
+  },
 
     // montura visible (cuadrúpedo simple, mirando hacia +Z como el personaje)
     buildMountMesh() {
@@ -297,6 +437,12 @@ const Player = {
   },
 
   animate(dt, moving, speed, forward) {
+    if (this.glbActive && this.mixer) {
+      this._animateGLB(dt, moving, speed);
+      this._placeModel(dt, moving);
+      this.anim.t += dt;
+      return;
+    }
     const a = this.model.userData;
     const t = this.anim.t;
     const bob = Math.sin(t * 10) * (moving ? 0.18 : 0.03);
@@ -333,6 +479,13 @@ const Player = {
       wpn.rotation.z = -0.15;
       a.arms[1].rotation.x = Math.sin(t * 10) * 0.08 * (moving ? 1 : 0);
     }
+    this._placeModel(dt, moving);
+    this.anim.t += dt;
+  },
+
+  // posición del modelo (suelo, montura y balanceo)
+  _placeModel(dt, moving) {
+    const t = this.anim.t;
     if (this.riding) {
       const mm = this.buildMountMesh();
       mm.visible = true;
@@ -350,12 +503,24 @@ const Player = {
       if (this.mountMesh) this.mountMesh.visible = false;
       this.model.position.set(this.pos.x, this.pos.y + 0.02, this.pos.z);
     }
-    this.anim.t += dt;
   },
 
   // caída al morir (el bucle la llama mientras Game.dead)
   deathPose(dt) {
     if (!this.model) return;
+    if (this.glbActive && this.mixer) {
+      if (!this._glbDead) {
+        this._glbDead = true;
+        this._glbOnce = null;
+        this._glbCur = null;
+        this._playGLBOnce(this.clips["Death_A"] ? "Death_A" : "Death_B");
+      }
+      this.mixer.update(dt);
+      this.model.rotation.x = 0;
+      this.model.position.set(this.pos.x, this.pos.y + 0.02, this.pos.z);
+      this.anim.t += dt;
+      return;
+    }
     this.model.rotation.x = Utils.damp(this.model.rotation.x, -1.5, 5, dt);
     this.model.position.set(this.pos.x, this.pos.y + 0.3, this.pos.z);
     this.anim.t += dt;
