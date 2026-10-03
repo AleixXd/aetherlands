@@ -107,7 +107,7 @@ foreach ($t in $tests) {
 }
 $fin = @($console | Where-Object { $_ -match '\[TEST\]\tFIN\t' })
 Check "probe llego a FIN" ($fin.Count -gt 0)
-$errs = @($console | Where-Object { $_ -notmatch '\[TEST\]|\[SW\]|deprecated' -and $_ -match 'Uncaught|ReferenceError|TypeError|SyntaxError|RangeError' })
+$errs = @($console | Where-Object { $_ -notmatch '\[TEST\]|\[SW\]|deprecated' -and $_ -match 'Uncaught|ReferenceError|TypeError|SyntaxError|RangeError|Shader Error|GL_INVALID' })
 Check "consola sin errores JS" ($errs.Count -eq 0) ($errs.Count.ToString() + " errores")
 if ($fin.Count -gt 0) { Check "0 aserciones fallidas" (-not ($fin -match 'fails=(?!0)')) }
 

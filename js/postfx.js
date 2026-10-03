@@ -19,7 +19,7 @@ const PostFX = {
   knee: 0.5,
   strength: 0.85,       // peso del bloom a media resolución
   wide: 1.05,           // peso del bloom anchored (1/4 res)
-  aoStrength: 0.5,
+  aoStrength: 0.55,
   aoRadius: 0.6,
   aoBias: 0.045,
 
@@ -106,11 +106,11 @@ const PostFX = {
       depthTest: false, depthWrite: false,
     });
 
-    // kernel hemisférico (8 muestras) para SSAO
+    // kernel hemisférico (16 muestras) para SSAO
     const kernel = [];
-    for (let i = 0; i < 8; i++) {
+    for (let i = 0; i < 16; i++) {
       const v = new THREE.Vector3(Math.random() * 2 - 1, Math.random() * 2 - 1, Math.random() * 0.9 + 0.1);
-      v.normalize().multiplyScalar(0.3 + 0.7 * (i / 7));
+      v.normalize().multiplyScalar(0.3 + 0.7 * (i / 15));
       kernel.push(v);
     }
     this.mAO = new THREE.ShaderMaterial({
@@ -128,7 +128,7 @@ const PostFX = {
         uniform sampler2D tDepth;
         uniform mat4 uProj; uniform mat4 uProjInv;
         uniform vec2 uTexel; uniform float uRadius; uniform float uBias;
-        uniform vec3 uKernel[8];
+        uniform vec3 uKernel[16];
         varying vec2 vUv;
         vec3 viewPos(vec2 uv, float d){
           vec4 ndc = vec4(uv * 2.0 - 1.0, d * 2.0 - 1.0, 1.0);
@@ -153,7 +153,7 @@ const PostFX = {
           vec3 bb = cross(n, tt);
           mat3 TBN = mat3(tt, bb, n);
           float occ = 0.0;
-          for (int i = 0; i < 8; i++) {
+          for (int i = 0; i < 16; i++) {
             vec3 sp = vp + TBN * uKernel[i] * uRadius;
             vec4 op = uProj * vec4(sp, 1.0);
             vec2 suv = op.xy / op.w * 0.5 + 0.5;
@@ -163,8 +163,37 @@ const PostFX = {
             float range = smoothstep(0.0, 1.0, uRadius / max(abs(vp.z - ss.z), 1e-4));
             occ += step(uBias, ss.z - vp.z) * range;
           }
-          float ao = clamp(1.0 - occ / 8.0, 0.0, 1.0);
+          float ao = clamp(1.0 - occ / 16.0, 0.0, 1.0);
           gl_FragColor = vec4(vec3(ao), 1.0);
+        }`,
+      depthTest: false, depthWrite: false,
+    });
+
+    // desenfoque de AO con peso por profundidad (no mancha siluetas)
+    this.mAOBlur = new THREE.ShaderMaterial({
+      uniforms: {
+        tAO: { value: null }, tDepth: { value: null },
+        uDir: { value: new THREE.Vector2() },
+      },
+      vertexShader: VERT,
+      fragmentShader: `
+        uniform sampler2D tAO; uniform sampler2D tDepth;
+        uniform vec2 uDir;
+        varying vec2 vUv;
+        void main(){
+          float dc = texture2D(tDepth, vUv).x;
+          float sum = texture2D(tAO, vUv).x, wsum = 1.0;
+          for (int i = 1; i <= 4; i++) {
+            vec2 off = uDir * float(i);
+            float d1 = texture2D(tDepth, vUv + off).x;
+            float d2 = texture2D(tDepth, vUv - off).x;
+            float w1 = exp(-abs(d1 - dc) * 4000.0);
+            float w2 = exp(-abs(d2 - dc) * 4000.0);
+            sum += texture2D(tAO, vUv + off).x * w1;
+            sum += texture2D(tAO, vUv - off).x * w2;
+            wsum += w1 + w2;
+          }
+          gl_FragColor = vec4(vec3(sum / wsum), 1.0);
         }`,
       depthTest: false, depthWrite: false,
     });
@@ -220,7 +249,15 @@ const PostFX = {
             col += texture2D(tWide, vUv).rgb * uWide;
           }
           col = fxAces(col);
-          gl_FragColor = vec4(fxSRGB(col), 1.0);
+          col = fxSRGB(col);
+          // gradación: contraste suave y saturación ligera
+          col = (col - 0.5) * 1.06 + 0.5;
+          float luma = dot(col, vec3(0.2126, 0.7152, 0.0722));
+          col = mix(vec3(luma), col, 1.10);
+          // viñeta
+          float vig = smoothstep(1.35, 0.45, length(vUv - 0.5) * 1.9);
+          col *= mix(0.80, 1.0, vig);
+          gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
         }`,
       depthTest: false, depthWrite: false,
     });
@@ -312,13 +349,14 @@ const PostFX = {
     u.uRadius.value = this.aoRadius;
     u.uBias.value = this.aoBias;
     this._pass(this.mAO, this.rtAO);
-    // desenfoque para eliminar el ruido del hash
-    const ub = this.mBlur.uniforms;
+    // desenfoque con peso por profundidad (2 pasadas)
+    const ub = this.mAOBlur.uniforms;
+    ub.tDepth.value = this.rtScene.depthTexture;
     const w = this.rtAO.width, h = this.rtAO.height;
-    ub.tDiffuse.value = this.rtAO.texture; ub.uDir.value.set(1 / w, 0);
-    this._pass(this.mBlur, this.rtAO2);
-    ub.tDiffuse.value = this.rtAO2.texture; ub.uDir.value.set(0, 1 / h);
-    this._pass(this.mBlur, this.rtAO);
+    ub.tAO.value = this.rtAO.texture; ub.uDir.value.set(1 / w, 0);
+    this._pass(this.mAOBlur, this.rtAO2);
+    ub.tAO.value = this.rtAO2.texture; ub.uDir.value.set(0, 1 / h);
+    this._pass(this.mAOBlur, this.rtAO);
   },
 
   /* ---------------- bucle ---------------- */
