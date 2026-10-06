@@ -1,7 +1,7 @@
 # tests/run.ps1 — suite de regresion de Aetherlands (sin dependencias: solo Chrome + PowerShell)
 # Uso:  powershell -ExecutionPolicy Bypass -File tests\run.ps1
 # Exit 0 = todo OK · Exit 1 = hay fallos · Exit 2 = entorno roto
-param([int]$Port = 8941, [int]$WaitSec = 100)
+param([int]$Port = 8941, [int]$WaitSec = 180)
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
 $chrome = "C:\Program Files\Google\Chrome\Application\chrome.exe"
@@ -68,7 +68,7 @@ for ($i = 0; $i -lt 20 -and -not $up; $i++) {
 Check "servidor local en :$Port" $up
 $chromeOk = $false
 if ($up) {
-  $arg = "--headless=new --no-sandbox --disable-extensions --disable-background-networking --use-angle=swiftshader --enable-unsafe-swiftshader --enable-logging=stderr --v=0 --user-data-dir=`"$prof`" --virtual-time-budget=6000 --hide-scrollbars --window-size=1280,720 --screenshot=`"$png`" `"http://localhost:$Port/__autotest.html`""
+  $arg = "--headless=new --no-sandbox --disable-extensions --disable-background-networking --use-angle=swiftshader --enable-unsafe-swiftshader --enable-logging=stderr --v=0 --user-data-dir=`"$prof`" --virtual-time-budget=24000 --hide-scrollbars --window-size=1280,720 --screenshot=`"$png`" `"http://localhost:$Port/__autotest.html`""
   $p = Start-Process -FilePath $chrome -ArgumentList $arg -RedirectStandardError $errFile -RedirectStandardOutput $outFile -PassThru -WindowStyle Hidden
   # espera el FIN del probe por stderr (el cierre de Chrome depende del render y puede ser lento)
   $w = 0; $finSeen = $false

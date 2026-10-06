@@ -188,6 +188,26 @@
     });
   }
 
+  function testTownGlb() {
+    return new Promise(function (resolve) {
+      var tries = 0;
+      var iv = setInterval(function () {
+        tries++;
+        var npcs = (typeof Build !== "undefined" && Build.npcMixers) ? Build.npcMixers.length : 0;
+        var ready = (typeof Build !== "undefined" && Build.glbReady) ? Build.glbReady : 0;
+        if (npcs >= 11 && ready >= 29) {
+          clearInterval(iv);
+          T("pueblo: glb", true, "mixers=" + npcs + " glbReady=" + ready);
+          resolve();
+        } else if (tries >= 360) {
+          clearInterval(iv);
+          T("pueblo: glb", false, "mixers=" + npcs + " glbReady=" + ready + " (esperaba 11/29)");
+          resolve();
+        }
+      }, 50);
+    });
+  }
+
   function finish() {
     console.log("[TEST]\tFIN\ttotal=" + total + "\tfails=" + fails);
   }
@@ -201,7 +221,7 @@
         T("arranque: gameReady", true, "");
         try { testSave(); testCollisions(); testMinimap(); testAccount(); }
         catch (e) { T("suite", false, e.message); }
-        Promise.all([testPwa(), testCloud(), testGlb()]).then(finish);
+        Promise.all([testPwa(), testCloud(), testGlb(), testTownGlb()]).then(finish);
       } else if (tries >= 600) {
         clearInterval(iv);
         T("arranque: gameReady", false, "timeout");

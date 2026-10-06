@@ -1,5 +1,5 @@
 /* Aetherlands — Service Worker: offline + actualización en segundo plano */
-const CACHE = "aetherlands-v3";
+const CACHE = "aetherlands-v4";
 const FILES = [
   "./",
   "./index.html",
@@ -9,7 +9,9 @@ const FILES = [
   "./css/style.css",
   "./js/lib/three.min.js",
   "./js/lib/GLTFLoader.js",
+  "./js/lib/SkeletonUtils.js",
   "./js/utils/BufferGeometryUtils.js",
+  "./js/utils/glb.js",
   "./js/core/config.js",
   "./js/core/utils.js",
   "./js/core/data.js",

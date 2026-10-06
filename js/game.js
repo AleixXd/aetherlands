@@ -328,6 +328,8 @@ const Game = {
     const p = Save.data.player.pos;
     this.player.pos.set(p.x, this.groundHeight(p.x, p.z) + 0.6, p.z);
     this.player.vel.set(0, 0, 0);
+    // el modelo se posiciona en buildModel (antes del spawn): recolócalo
+    if (this.player.model) this.player.model.position.copy(this.player.pos);
     this.player.hp = this.player.stats().maxHp;
     this.player.stam = this.player.stats().maxStam;
   },

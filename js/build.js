@@ -19,6 +19,8 @@ const Build = {
   birds: [],
   fires: [],
   lampMats: [],
+  npcMixers: [],
+  glbReady: 0,
   fountainWater: null,
   _animT: 0,
 
@@ -36,6 +38,8 @@ const Build = {
     this.birds = [];
     this.fires = [];
     this.lampMats = [];
+    this.npcMixers = [];
+    this.glbReady = 0;
     this.fountainWater = null;
     this._animT = 0;
     this.buildTown();
@@ -239,6 +243,130 @@ const Build = {
   },
 
   /* ============================================================
+     CASA GLB — modelo KayKit con fallback procedural.
+     opts: { h, wall, roof, chimney }. El grupo empieza con la casa
+     procedural y se sustituye por el modelo cuando termina la carga.
+     userData.size = huella final (para colisionadores sincrónicos).
+     ============================================================ */
+  houseGLB(kind, opts) {
+    opts = opts || {};
+    const cfg = {
+      home_A: { ht: 0.93, w: 0.79, d: 0.85, chimney: [-0.30, 1.04, -0.12] },
+      home_B: { ht: 1.28, w: 0.87, d: 1.10, chimney: null },
+      tavern: { ht: 1.40, w: 1.17, d: 1.33, chimney: null },
+    }[kind];
+    const g = new THREE.Group();
+    const h = opts.h || 6.5;
+    const s = h / cfg.ht;
+    g.userData.size = { w: cfg.w * s, d: cfg.d * s };
+    const smokeBefore = this.smokeAnims.length;
+    const fbopts = Object.assign({}, opts, { chimney: opts.chimney !== false && !!cfg.chimney });
+    const fb = this.house(g.userData.size.w, g.userData.size.d, opts.wallH || h * 0.6, opts.wall, opts.roof, fbopts);
+    g.add(fb);
+    const fbSmoke = this.smokeAnims.length > smokeBefore ? this.smokeAnims[smokeBefore] : null;
+    GLBCache.instance("models/kaykit/" + kind + ".gltf").then((entry) => {
+      if (!entry) return;
+      const root = entry.root;
+      root.scale.setScalar(1);
+      root.position.set(0, 0, 0);
+      root.rotation.set(0, 0, 0);
+      root.updateMatrixWorld(true);
+      const box = new THREE.Box3().setFromObject(root);
+      const k = h / ((box.max.y - box.min.y) || h);
+      root.scale.setScalar(k);
+      root.position.y = -box.min.y * k;
+      root.traverse((o) => {
+        if (o.isMesh || o.isSkinnedMesh) { o.castShadow = true; o.receiveShadow = true; }
+      });
+      // fuera el fallback (y su humo) — dentro el modelo, con humo propio
+      if (fbSmoke) {
+        const idx = this.smokeAnims.indexOf(fbSmoke);
+        if (idx >= 0) this.smokeAnims.splice(idx, 1);
+        for (const p of fbSmoke.puffs) if (p.mesh.parent) p.mesh.parent.remove(p.mesh);
+      }
+      while (g.children.length) g.remove(g.children[0]);
+      g.add(root);
+      if (cfg.chimney) {
+        this.addSmoke(g, cfg.chimney[0] * g.userData.size.w, h * cfg.chimney[1], cfg.chimney[2] * g.userData.size.d, 4);
+      }
+      g.userData.glb = kind;
+      this.glbReady++;
+    });
+    return g;
+  },
+
+  /* prop KayKit suelto (barriles, carreta, vallas...). opts:
+     { x, y, z, h, yaw, parent, collider } — si falla la carga, no añade nada */
+  addKayProp(file, opts) {
+    opts = opts || {};
+    if (opts.collider) this.colliders.push(opts.collider);
+    GLBCache.instance("models/kaykit/" + file + ".gltf").then((entry) => {
+      if (!entry) return;
+      const root = entry.root;
+      root.scale.setScalar(1);
+      root.position.set(0, 0, 0);
+      root.rotation.set(0, 0, 0);
+      root.updateMatrixWorld(true);
+      const box = new THREE.Box3().setFromObject(root);
+      const s = (opts.h || 1) / ((box.max.y - box.min.y) || 1);
+      root.scale.setScalar(s);
+      root.position.y = -box.min.y * s;
+      if (opts.yaw) root.rotation.y = opts.yaw;
+      root.traverse((o) => {
+        if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; }
+      });
+      const g = new THREE.Group();
+      g.add(root);
+      g.position.set(opts.x || 0, opts.y || 0, opts.z || 0);
+      (opts.parent || this.scene).add(g);
+      this.glbReady++;
+    });
+  },
+
+  /* ---------------- NPC con personaje GLB animado ---------------- */
+  _npcFileFor(n) {
+    const m = {
+      shop_weapon: "knight", shop_armor: "barbarian", shop_potion: "mage",
+      gacha: "rogue_hooded", quest_alaric: "rogue", quest_maren: "rogue_hooded",
+      quest_kralynn: "knight", quest_deus: "knight", mountshop: "barbarian",
+      trade: "rogue", pvp: "barbarian",
+    };
+    return m[n.id] || "knight";
+  },
+
+  _attachNPCGLB(g, n) {
+    GLBCache.instance("models/" + this._npcFileFor(n) + ".glb").then((entry) => {
+      if (!entry || !g.parent) return;
+      const root = entry.root;
+      root.scale.setScalar(1);
+      root.position.set(0, 0, 0);
+      root.rotation.set(0, 0, 0);
+      root.updateMatrixWorld(true);
+      const box = new THREE.Box3().setFromObject(root);
+      const s = 1.75 / ((box.max.y - box.min.y) || 1.75);
+      root.scale.setScalar(s);
+      root.position.y = -box.min.y * s;
+      root.rotation.y = Math.PI / 2;
+      root.traverse((o) => {
+        if (o.isMesh || o.isSkinnedMesh) { o.castShadow = true; o.frustumCulled = false; }
+      });
+      while (g.children.length) g.remove(g.children[0]);
+      g.add(root);
+      const mixer = new THREE.AnimationMixer(root);
+      const clips = {};
+      for (const c of entry.animations) clips[c.name] = c;
+      const idle = clips["Idle"] || clips["Unarmed_Idle"] || (entry.animations[0]);
+      if (idle) {
+        const act = mixer.clipAction(idle);
+        act.play();
+        mixer.setTime(Math.random() * (idle.duration || 1)); // desfase entre NPCs
+      }
+      this.npcMixers.push(mixer);
+      this.glbReady++;
+    });
+  },
+
+  /* ============================================================
      Plaza del pueblo
      ============================================================ */
   buildTown() {
@@ -309,7 +437,7 @@ const Build = {
     this.fountainWater = fWater;
     this.colliders.push({ x: 0, z: 0, hw: 3.5, hd: 3.5, a: 0 });
 
-    // --- casas del pueblo (tejado a dos aguas, chimenea con humo) ---
+    // --- casas del pueblo (modelos KayKit con fallback procedural) ---
     const townHouses = [
       { a: 10, b: 31, angle: 0 },
       { a: 36, b: -24, angle: 1.2 },
@@ -319,16 +447,26 @@ const Build = {
       { a: -52, b: 2, angle: -2.4 },
       { a: 50, b: 26, angle: 0.5 },
     ];
+    const townKinds = ["home_A", "home_B", "home_A", "home_B", "home_A", "home_B", "tavern"];
     const wallCols = [0xcfd8dc, 0xd7ccc8, 0xe0d0b0, 0xbfd0d8, 0xd8c9a8];
     const roofCols = [0x8d5a3a, 0x7c4a30, 0x9c6844, 0x6e4a58];
     for (let i = 0; i < townHouses.length; i++) {
       const hdef = townHouses[i];
-      const house = this.house(9, 7, 4.6, wallCols[i % wallCols.length], roofCols[i % roofCols.length]);
+      const kind = townKinds[i];
+      const house = this.houseGLB(kind, {
+        h: kind === "tavern" ? 7.0 : 6.5,
+        wall: wallCols[i % wallCols.length],
+        roof: roofCols[i % roofCols.length],
+      });
       house.rotation.y = hdef.angle;
       const gpos = this.ground(hdef.a, hdef.b);
       house.position.set(gpos.x, gpos.y, gpos.z);
       this.scene.add(house);
-      this.colliders.push({ x: gpos.x, z: gpos.z, hw: 4.5, hd: 3.5, a: hdef.angle });
+      this.colliders.push({
+        x: gpos.x, z: gpos.z,
+        hw: house.userData.size.w / 2 + 0.15, hd: house.userData.size.d / 2 + 0.15,
+        a: hdef.angle,
+      });
     }
 
     // --- farolas del perímetro (brillo por noche) ---
@@ -360,13 +498,14 @@ const Build = {
       // el kiosco mira al centro: NPC y rótulo hacia dentro
       const dl = Math.hypot(sx, sz) || 1;
       const dnx = -sx / dl, dnz = -sz / dl;
+      const sry = Math.atan2(dnx, dnz);
 
       const kiosk = this.makeKiosk(n, shop);
       kiosk.position.set(sx, sy, sz);
+      kiosk.rotation.y = sry; // el puesto mira al centro de la plaza
       this.scene.add(kiosk);
 
       // rótulo colgado del alero, con icono del oficio
-      const sry = Math.atan2(dnx, dnz);
       const signG = new THREE.Group();
       const board = this.box(1.6, 0.9, 0.16, 0x3a2c1a, { rough: 0.85 });
       const icon = this.iconPlane(n.icon || "\u2605", 88);
@@ -389,9 +528,10 @@ const Build = {
       npc.position.x = npx; npc.position.z = npz;
       npc.rotation.y = sry;
       this.scene.add(npc);
+      this._attachNPCGLB(npc, n);
       this.npcTags.push({ x: npx, y: nyy + 2.6, z: npz, label: n.name, sub: n.title, color: n.roleColor || "#e8d8b8" });
       this.interactables.push({ id: n.id, type: "npc", x: npx, z: npz, radius: 3.6, npc: n });
-      this.colliders.push({ x: sx, z: sz, hw: 2.7, hd: 2.3, a: 0 });
+      this.colliders.push({ x: sx, z: sz, hw: 3.2, hd: 2.5, a: sry });
     }
 
     // --- mobiliario de la plaza ---
@@ -495,6 +635,20 @@ const Build = {
     this.scene.add(cart);
     this.colliders.push({ x: -14, z: 20, hw: 1.7, hd: 1.55, a: 0.7 });
 
+    // --- props KayKit junto a las casas del pueblo ---
+    const propSpot = (x, z) => World.heightAt(x, z);
+    this.addKayProp("resource_lumber", { x: 15.5, y: propSpot(15.5, 33), z: 33, h: 0.8, yaw: 0.6 });
+    this.addKayProp("barrel", { x: 6.2, y: propSpot(6.2, 34.5), z: 34.5, h: 1.0 });
+    this.addKayProp("barrel", { x: 40, y: propSpot(40, -20.5), z: -20.5, h: 1.0 });
+    this.addKayProp("crate_A_big", { x: 41.4, y: propSpot(41.4, -21.6), z: -21.6, h: 0.9, yaw: 0.5 });
+    this.addKayProp("wheelbarrow", { x: 45.5, y: propSpot(45.5, 22.5), z: 22.5, h: 0.6, yaw: 1.0 });
+    this.addKayProp("crate_open", { x: 54, y: propSpot(54, 30), z: 30, h: 0.8, yaw: -0.4 });
+    this.addKayProp("sack", { x: 47.6, y: propSpot(47.6, 30.5), z: 30.5, h: 0.6, yaw: 0.8 });
+    this.addKayProp("well", {
+      x: 11, y: propSpot(11, -49), z: -49, h: 2.6, yaw: 0.4,
+      collider: { x: 11, z: -49, r: 1.1 },
+    });
+
     // --- gallinas y gallinero ---
     const coop = new THREE.Group();
     const coopBox = this.box(2.4, 1.5, 1.8, 0x8a6a42);
@@ -576,16 +730,20 @@ const Build = {
     const A = shop ? 0xb4374a : 0x3a6ea5;   // color principal del toldo
     const B = 0xf0e6d2;                       // franja clara
 
+    // cuerpo base: procedural como fallback hasta que carga el modelo
+    const body = new THREE.Group();
+    g.add(body);
+
     // plataforma
     const plat = this.box(5.4, 0.28, 4.6, 0x8a8072, { rough: 1 });
     plat.position.y = 0.14;
-    g.add(plat);
+    body.add(plat);
 
     // 4 postes
     for (const px of [-1, 1]) for (const pz of [-1, 1]) {
       const post = this.box(0.2, 2.9, 0.2, wood);
       post.position.set(px * 2.4, 1.45 + 0.28, pz * 2.0);
-      g.add(post);
+      body.add(post);
     }
 
     // mostradores dobles (mercancía por ambos lados)
@@ -594,24 +752,24 @@ const Build = {
       counter.position.set(0, 0.73, sz * 1.62);
       const top = this.box(4.8, 0.12, 1.2, 0x5c4024, { rough: 0.85 });
       top.position.set(0, 1.24, sz * 1.62);
-      g.add(counter, top);
+      body.add(counter, top);
     }
     // panel lateral bajo (silueta del kiosco)
     for (const sx of [-1, 1]) {
       const side = this.box(0.14, 1.1, 3.4, 0x7a5636);
       side.position.set(sx * 2.5, 0.83, 0);
-      g.add(side);
+      body.add(side);
     }
 
     // techo de listones a rayas
     const roofBase = this.box(5.7, 0.14, 4.9, wood);
     roofBase.position.y = 3.05;
-    g.add(roofBase);
+    body.add(roofBase);
     const stripes = 6, sw = 5.6 / stripes;
     for (let i = 0; i < stripes; i++) {
       const st = this.box(sw, 0.1, 4.94, i % 2 === 0 ? A : B, { rough: 0.8 });
       st.position.set(-2.8 + sw / 2 + i * sw, 3.16, 0);
-      g.add(st);
+      body.add(st);
     }
     // fleco colgante en los dos bordes largos
     for (const sz of [-1, 1]) {
@@ -619,9 +777,30 @@ const Build = {
         const flap = this.box(sw * 0.92, 0.4, 0.06, i % 2 === 0 ? B : A, { rough: 0.85 });
         flap.position.set(-2.8 + sw / 2 + i * sw, 2.88, sz * 2.46);
         flap.rotation.x = sz * 0.16;
-        g.add(flap);
+        body.add(flap);
       }
     }
+
+    // el modelo KayKit (market) sustituye al cuerpo cuando carga
+    GLBCache.instance("models/kaykit/market.gltf").then((entry) => {
+      if (!entry) return;
+      const root = entry.root;
+      root.scale.setScalar(1);
+      root.position.set(0, 0, 0);
+      root.rotation.set(0, 0, 0);
+      root.updateMatrixWorld(true);
+      const box = new THREE.Box3().setFromObject(root);
+      const k = 3.4 / ((box.max.y - box.min.y) || 3.4);
+      root.scale.setScalar(k);
+      root.position.y = -box.min.y * k;
+      root.traverse((o) => {
+        if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; }
+      });
+      g.remove(body);
+      g.add(root);
+      this.glbReady++;
+      this._settleGoods(g, goods, root);
+    });
 
     // mercancía según el oficio
     const goods = new THREE.Group();
@@ -748,6 +927,42 @@ const Build = {
     return g;
   },
 
+  /* Recoloca la mercancía sobre las superficies reales del modelo KayKit.
+     Medido por raycast: mostrador frontal y=1.56 (z 0.5-1.0, x -3..2),
+     estante izquierdo y=0.71, estante derecho y=1.26 (rel. a la losa).
+     La mercancía procedural va en z ±1.6: al cargar el GLB se reubica. */
+  _settleGoods(g, goods, glbRoot) {
+    g.updateMatrixWorld(true);
+    const ray = new THREE.Raycaster();
+    ray.far = 20;
+    const down = new THREE.Vector3(0, -1, 0);
+    const surf = (lx, lz) => {
+      const p = new THREE.Vector3(lx, 12, lz).applyMatrix4(g.matrixWorld);
+      ray.set(p, down);
+      const h = ray.intersectObject(glbRoot, true);
+      return h.length ? h[0].point.y - g.position.y : null;
+    };
+    const hf = surf(0, 0.55), hl = surf(-3.05, -1.2), hr = surf(3.05, -1.2);
+    const slots = { l: [-1.35, -0.75], r: [-1.35, -0.75] };
+    const used = { l: 0, r: 0 };
+    const seen = {};
+    for (const ch of goods.children) {
+      const p = ch.position;
+      if (p.z > 1.0) {
+        p.z = 0.55;
+        if (hf !== null) p.y += hf - 1.3;
+      } else if (p.z < -1.0) {
+        const side = p.x <= 0 ? "l" : "r";
+        const key = side + Math.round(p.x * 2);
+        if (!(key in seen)) seen[key] = slots[side][used[side]++ % 2];
+        p.x = side === "l" ? -3.05 : 3.05;
+        p.z = seen[key];
+        const t = side === "l" ? hl : hr;
+        if (t !== null) p.y += t - 1.3;
+      }
+    }
+  },
+
   /* ---------------- NPC del pueblo ---------------- */
   makeNPC(n, y) {
     const g = new THREE.Group();
@@ -845,24 +1060,27 @@ const Build = {
     }
     // base platform
     const plat = this.box(34, 2, 34, 0x8d94a5, { rough: 0.9 });
-    plat.position.set(0, y0 - 1, -96);
+    plat.position.set(0, y0 - 1, 0);
     g.add(plat);
     // door + braziers
     const door = this.box(3.4, 5, 1.2, 0x3a2c1c);
-    door.position.set(0, y0 + 2.5, -96 + 17);
+    door.position.set(0, y0 + 2.5, 17);
     g.add(door);
     for (const sx of [-1, 1]) {
       const brazier = this.cyl(0.5, 0.35, 0.7, 8, 0x3c3c46, { metal: 0.4, rough: 0.6 });
-      brazier.position.set(sx * 3.4, y0 + 2.4, -96 + 17.6);
+      brazier.position.set(sx * 3.4, y0 + 2.4, 17.6);
       const flameM = this.mat(0xffb040, { emissive: 0xff6a20, emissiveIntensity: 3 });
       const flame = new THREE.Mesh(new THREE.ConeGeometry(0.34, 0.9, 6), flameM);
-      flame.position.set(sx * 3.4, y0 + 3.2, -96 + 17.6);
+      flame.position.set(sx * 3.4, y0 + 3.2, 17.6);
       g.add(brazier, flame);
       this.fires.push({ mesh: flame, mat: flameM, ph: sx > 0 ? 1.7 : 0.3, base: 3 });
-      this.addSmoke(g, sx * 3.4, y0 + 3.9, -96 + 17.6, 3);
+      this.addSmoke(g, sx * 3.4, y0 + 3.9, 17.6, 3);
       this.colliders.push({ x: sx * 3.4, z: -96 + 17.6, r: 0.6 });
     }
     this.colliders.push({ x: 0, z: -96, hw: 17, hd: 17, a: 0 });
+    // el cuerpo de la torre va en el yacimiento del castillo (z=-96),
+    // junto a puerta/plataforma/interactable (coordenadas ya relativas a g)
+    g.position.set(0, 0, -96);
     this.scene.add(g);
 
     // gatehouses / walls of town
@@ -947,13 +1165,18 @@ const Build = {
       const a = i / 5 * Math.PI * 2;
       const r = 16 + (i % 2) * 7;
       const hx = Math.cos(a) * r, hz = Math.sin(a) * r;
-      const h = this.house(6, 5, 3.2, wallCol, roofCol, { chimney: i % 2 === 0 });
+      const h = this.houseGLB(i % 2 ? "home_B" : "home_A", {
+        h: 5.0, wall: wallCol, roof: roofCol, chimney: i % 2 === 0,
+      });
       h.rotation.y = a;
       h.position.set(hx, 0, hz);
       // aspecto ruinoso
       if (i % 2 === 0) h.rotation.z = 0.12;
       g.add(h);
-      this.colliders.push({ x: v.x + hx, z: v.z + hz, hw: 3, hd: 2.5, a: a });
+      this.colliders.push({
+        x: v.x + hx, z: v.z + hz,
+        hw: h.userData.size.w / 2 + 0.15, hd: h.userData.size.d / 2 + 0.15, a: a,
+      });
       // escombros junto a las casas caídas
       if (i % 2 === 0) {
         for (let k = 0; k < 3; k++) {
@@ -964,6 +1187,10 @@ const Build = {
         }
       }
     }
+    // tienda de campaña y bodegas de los ocupantes
+    this.addKayProp("tent", { x: -8, y: 0, z: 7, h: 2.6, yaw: 0.7, parent: g, collider: { x: v.x - 8, z: v.z + 7, r: 0.9 } });
+    this.addKayProp("barrel", { x: -7.5, y: 0, z: -2.6, h: 1.0, parent: g });
+    this.addKayProp("crate_A_big", { x: 5.4, y: 0, z: 2.4, h: 0.9, yaw: 0.4, parent: g });
     // barricades + campfire
     const bf = this.box(5, 0.9, 1, 0x8a6f3c);
     bf.position.set(4, 0.45, 4);
@@ -1139,6 +1366,9 @@ const Build = {
   update(dt, playerPos) {
     this._animT += dt;
     const t = this._animT;
+
+    // NPCs: animación Idle (mezcladores con desfase entre sí)
+    for (const m of this.npcMixers) m.update(dt);
 
     // humo de chimeneas y fogatas
     for (const s of this.smokeAnims) {

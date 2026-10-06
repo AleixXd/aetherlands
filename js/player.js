@@ -26,7 +26,7 @@ const Player = {
   anim: { t: 0, falling: 0 },
   // personaje GLB (KayKit, esqueleto + AnimationMixer)
   glbActive: false, mixer: null, clips: {},
-  _glbGen: 0, _glbCache: {}, _glbCur: null,
+  _glbGen: 0, _glbCur: null,
   _glbOnce: null, _glbAttack: false, _glbDead: false,
   _glbYawFix: Math.PI / 2,
 
@@ -159,23 +159,10 @@ const Player = {
   _loadGLB() {
     const file = this._glbFileFor(this.classDef);
     const gen = ++this._glbGen;
-    const start = () => {
-      if (gen !== this._glbGen || !window.GLTFLoader) return;
-      const cached = this._glbCache[file];
-      if (cached) { this._applyGLB(cached); return; }
-      const loader = new window.GLTFLoader();
-      loader.load("models/" + file + ".glb",
-        (gltf) => {
-          if (gen !== this._glbGen) return;
-          const entry = { root: gltf.scene, animations: gltf.animations || [] };
-          this._glbCache[file] = entry;
-          this._applyGLB(entry);
-        },
-        undefined,
-        (err) => { console.warn("[GLB] carga fallida:", file, err && (err.message || err)); });
-    };
-    if (window.GLTFLoader) start();
-    else window.addEventListener("gltfloader-ready", start, { once: true });
+    GLBCache.instance("models/" + file + ".glb").then((entry) => {
+      if (gen !== this._glbGen) return;
+      if (entry) this._applyGLB(entry);
+    });
   },
 
   _applyGLB(entry) {
