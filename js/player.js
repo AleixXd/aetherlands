@@ -28,7 +28,6 @@ const Player = {
   glbActive: false, mixer: null, clips: {},
   _glbGen: 0, _glbCur: null,
   _glbOnce: null, _glbAttack: false, _glbDead: false,
-  _glbYawFix: Math.PI / 2,
 
   init(game) {
     this.game = game;
@@ -179,7 +178,7 @@ const Player = {
     const s = 1.85 / h;
     root.scale.setScalar(s);
     root.position.y = -box.min.y * s;
-    root.rotation.y = this._glbYawFix;
+    root.rotation.set(0, 0, 0);
     root.traverse((o) => {
       if (o.isMesh || o.isSkinnedMesh) {
         o.castShadow = true;

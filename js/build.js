@@ -346,7 +346,6 @@ const Build = {
       const s = 1.75 / ((box.max.y - box.min.y) || 1.75);
       root.scale.setScalar(s);
       root.position.y = -box.min.y * s;
-      root.rotation.y = Math.PI / 2;
       root.traverse((o) => {
         if (o.isMesh || o.isSkinnedMesh) { o.castShadow = true; o.frustumCulled = false; }
       });
