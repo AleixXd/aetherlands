@@ -357,6 +357,7 @@ const Player = {
 
     // gravity & ground
     this.vel.y -= CFG.PLAYER.GRAVITY * dt;
+    this.pos.y += this.vel.y * dt;
     this.pos.x += this.vel.x * dt;
     this.pos.z += this.vel.z * dt;
 

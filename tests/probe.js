@@ -208,6 +208,41 @@
     });
   }
 
+  function testJump() {
+    return new Promise(function (resolve) {
+      var p = (typeof Game !== "undefined" && Game.player) ? Game.player : null;
+      if (!p || typeof p.tryJump !== "function") {
+        T("salto: sube", false, "sin player");
+        return resolve();
+      }
+      try { Game.enterWorld(); } catch (e) { console.log("[TEST] enterWorld ERROR: " + e.message); }
+      // asienta el spawn (rAF fiable en headless) antes de medir la referencia
+      for (var s = 0; s < 12; s++) {
+        try { Game.player.update(0.05); } catch (e) { break; }
+      }
+      var y0 = p.pos.y, x0 = p.pos.x, z0 = p.pos.z, maxDy = 0, t = 0;
+      p.tryJump();
+      // en headless el rAF puede quedarse sin presupuesto virtual:
+      // empujamos la física a mano con dt fijo (mismo código que el bucle real)
+      var iv = setInterval(function () {
+        t++;
+        for (var k = 0; k < 3; k++) {
+          try { Game.player.update(0.05); } catch (e) { /* seguro si el bucle está vivo */ }
+        }
+        var dy = p.pos.y - y0;
+        if (dy > maxDy) maxDy = dy;
+        if (t >= 50) {
+          clearInterval(iv);
+          T("salto: sube", maxDy > 0.5, "maxDy=" + maxDy.toFixed(2) + " y0=" + y0.toFixed(2));
+          T("salto: aterriza", p.onGround && Math.abs(p.pos.y - y0) < 0.3,
+            "onGround=" + p.onGround + " dy=" + (p.pos.y - y0).toFixed(2) +
+            " dx=" + (p.pos.x - x0).toFixed(2) + " dz=" + (p.pos.z - z0).toFixed(2));
+          resolve();
+        }
+      }, 50);
+    });
+  }
+
   function finish() {
     console.log("[TEST]\tFIN\ttotal=" + total + "\tfails=" + fails);
   }
@@ -221,7 +256,7 @@
         T("arranque: gameReady", true, "");
         try { testSave(); testCollisions(); testMinimap(); testAccount(); }
         catch (e) { T("suite", false, e.message); }
-        Promise.all([testPwa(), testCloud(), testGlb(), testTownGlb()]).then(finish);
+        Promise.all([testPwa(), testCloud(), testGlb(), testTownGlb(), testJump()]).then(finish);
       } else if (tries >= 600) {
         clearInterval(iv);
         T("arranque: gameReady", false, "timeout");
