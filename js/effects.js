@@ -185,26 +185,69 @@ const Effects = {
   /* ---------- projectiles ---------- */
   shoot(from, dir, opts) {
     opts = opts || {};
-    const size = opts.size || 0.35;
     const col = opts.color || 0xffb040;
-    const geo = new THREE.SphereGeometry(size, 8, 6);
-    const mat = new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending });
-    const m = new THREE.Mesh(geo, mat);
-    m.position.copy(from);
-    const trail = new THREE.Mesh(geo.clone(), mat.clone());
-    trail.scale.multiplyScalar(1.5);
-    m.add(trail);
     const sp = opts.speed || 30;
+    let m;
+    if (opts.kind === "arrow") {
+      m = this._arrow(col);
+      m.position.copy(from);
+      m.lookAt(from.x + dir.x, from.y + dir.y, from.z + dir.z);
+    } else {
+      const size = opts.size || 0.35;
+      const geo = new THREE.SphereGeometry(size, 8, 6);
+      const mat = new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending });
+      m = new THREE.Mesh(geo, mat);
+      m.position.copy(from);
+      const trail = new THREE.Mesh(geo.clone(), mat.clone());
+      trail.scale.multiplyScalar(1.5);
+      m.add(trail);
+    }
     this.scene.add(m);
     const life = (opts.range || 60) / sp;
     this.projectiles.push({
       mesh: m, vel: new THREE.Vector3(dir.x, dir.y, dir.z).normalize().multiplyScalar(sp),
       dmg: opts.dmg, from: opts.from || "player", element: opts.element || "fire",
+      kind: opts.kind,
       life: life, max: life, hitR: opts.hitR || 1.1, pierce: opts.pierce || 0,
       knock: opts.knock || 0, explode: opts.explode || 0, explodeR: opts.explodeR || 3.5,
       owner: opts.owner, onHit: opts.onHit,
     });
     return this.projectiles[this.projectiles.length - 1];
+  },
+
+  /* flecha física (arquero): geometría alineada a +Z, sin brillo */
+  _arrow(col) {
+    const g = new THREE.Group();
+    const wood = new THREE.MeshStandardMaterial({ color: 0x8a6a42, roughness: 0.9 });
+    const steel = new THREE.MeshStandardMaterial({ color: 0xcfd4dc, metalness: 0.7, roughness: 0.35 });
+    const feather = new THREE.MeshStandardMaterial({ color: col || 0xfff2d0, roughness: 1, side: THREE.DoubleSide });
+    const shaftGeo = new THREE.CylinderGeometry(0.02, 0.02, 0.72, 5);
+    shaftGeo.rotateX(Math.PI / 2);
+    g.add(new THREE.Mesh(shaftGeo, wood));
+    const headGeo = new THREE.ConeGeometry(0.055, 0.16, 5);
+    headGeo.rotateX(Math.PI / 2);
+    const head = new THREE.Mesh(headGeo, steel);
+    head.position.z = 0.44;
+    g.add(head);
+    const finGeo = new THREE.BoxGeometry(0.012, 0.1, 0.17);
+    for (let i = 0; i < 3; i++) {
+      const pivot = new THREE.Group();
+      pivot.rotation.z = i * Math.PI * 2 / 3;
+      const fin = new THREE.Mesh(finGeo, feather);
+      fin.position.set(0, 0.05, -0.26);
+      pivot.add(fin);
+      g.add(pivot);
+    }
+    return g;
+  },
+
+  _disposeProjectile(m) {
+    if (m.isGroup) {
+      m.traverse((o) => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); });
+    } else {
+      m.geometry.dispose();
+      m.material.dispose();
+    }
   },
 
   // ---------- transient FX update ----------
@@ -225,9 +268,13 @@ const Effects = {
     for (let i = this.projectiles.length - 1; i >= 0; i--) {
       const pr = this.projectiles[i];
       pr.life -= dt;
-      if (pr.life <= 0) { this.scene.remove(pr.mesh); pr.mesh.geometry.dispose(); pr.mesh.material.dispose(); this.projectiles.splice(i, 1); continue; }
+      if (pr.life <= 0) { this.scene.remove(pr.mesh); this._disposeProjectile(pr.mesh); this.projectiles.splice(i, 1); continue; }
       pr.mesh.position.addScaledVector(pr.vel, dt);
-      this.glowyOrbTrail(pr.mesh.position, pr.element === "fire" ? 0xff8a30 : pr.element === "ice" ? 0x80d8ff : pr.element === "holy" ? 0xffe66a : 0x90c8ff);
+      if (pr.kind === "arrow") {
+        pr.mesh.lookAt(pr.mesh.position.x + pr.vel.x, pr.mesh.position.y + pr.vel.y, pr.mesh.position.z + pr.vel.z);
+      } else {
+        this.glowyOrbTrail(pr.mesh.position, pr.element === "fire" ? 0xff8a30 : pr.element === "ice" ? 0x80d8ff : pr.element === "holy" ? 0xffe66a : 0x90c8ff);
+      }
       let hit = false;
       const enemies = game.enemyDirector ? game.enemyDirector.getNear(pr.mesh.position, 12) : [];
       if (pr.from === "player") {
@@ -256,7 +303,7 @@ const Effects = {
           hit = true;
         }
       }
-      if (hit) { this.scene.remove(pr.mesh); pr.mesh.geometry.dispose(); pr.mesh.material.dispose(); this.projectiles.splice(i, 1); }
+      if (hit) { this.scene.remove(pr.mesh); this._disposeProjectile(pr.mesh); this.projectiles.splice(i, 1); }
     }
     // FX meshes
     for (let i = this.meshes.length - 1; i >= 0; i--) {

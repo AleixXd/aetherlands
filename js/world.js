@@ -305,17 +305,27 @@ const World = {
         // inside hard POI centers -> no foliage
         let blocked = false;
         for (const [px, pz, rad, , hard] of this.allPoiBlends()) {
-          if (Math.sqrt((x - px) ** 2 + (z - pz) ** 2) < hard + 8) { blocked = true; break; }
+          // el pueblo admite vegetación desde 78 m (plaza+casas terminan en ~58);
+          // el castillo necesita 60 m de margen; el resto, su radio habitual
+          const ex = px === 0 && pz === 0 ? 78 : hard < 40 ? 60 : hard + 8;
+          if (Math.sqrt((x - px) ** 2 + (z - pz) ** 2) < ex) { blocked = true; break; }
         }
         if (blocked) continue;
-        const dens = b === BIOMES.forest ? 0.55 : b === BIOMES.swamp ? 0.4 : b === BIOMES.tundra ? 0.35 : 0.16;
+        const dens = b === BIOMES.forest ? 0.68 : b === BIOMES.swamp ? 0.5 : b === BIOMES.tundra ? 0.45 : 0.3;
         if (rng() > dens) {
-          // maybe grass tuft
-          if (b === BIOMES.plains || b === BIOMES.swamp) grass.push([x, h, z]);
+          // mata de hierba: 2-3 por celda, más densa y con variación
+          if (b === BIOMES.plains || b === BIOMES.swamp || b === BIOMES.forest) {
+            const n = b === BIOMES.plains ? 3 : 2;
+            for (let k = 0; k < n; k++) {
+              const gx = x + (rng2() - 0.5) * 8, gz = z + (rng2() - 0.5) * 8;
+              const gh = this.heightAt(gx, gz);
+              if (gh >= CFG.WORLD.WATER_LEVEL + 0.4) grass.push([gx, gh, gz, b === BIOMES.forest ? 0.78 : 1]);
+            }
+          }
           const fr = rng2();
           if (b === BIOMES.plains || b === BIOMES.forest) {
-            if (fr < 0.30) { const fx = x + (rng2() - 0.5) * 7, fz = z + (rng2() - 0.5) * 7; flowers.push([fx, this.heightAt(fx, fz), fz, rng2()]); }
-            else if (fr < 0.42) { const bx = x + (rng2() - 0.5) * 7, bz = z + (rng2() - 0.5) * 7; bushes.push([bx, this.heightAt(bx, bz), bz, 0.55 + rng2() * 0.6]); }
+            if (fr < 0.36) { const fx = x + (rng2() - 0.5) * 7, fz = z + (rng2() - 0.5) * 7; flowers.push([fx, this.heightAt(fx, fz), fz, rng2()]); }
+            else if (fr < 0.48) { const bx = x + (rng2() - 0.5) * 7, bz = z + (rng2() - 0.5) * 7; bushes.push([bx, this.heightAt(bx, bz), bz, 0.55 + rng2() * 0.6]); }
           } else if (b === BIOMES.swamp && fr < 0.16) {
             const bx = x + (rng2() - 0.5) * 7, bz = z + (rng2() - 0.5) * 7; bushes.push([bx, this.heightAt(bx, bz), bz, 0.5 + rng2() * 0.5]);
           } else if (b === BIOMES.volcanic && fr < 0.10) {
@@ -333,72 +343,101 @@ const World = {
       }
     }
     if (trees.length) {
-      const trunk = new THREE.InstancedMesh(
-        new THREE.CylinderGeometry(0.22, 0.34, 3, 6), new THREE.MeshStandardMaterial({ color: 0x6d4c33, roughness: 1 }), trees.length);
-      const canopy = new THREE.InstancedMesh(
-        new THREE.IcosahedronGeometry(1.1, 1), new THREE.MeshStandardMaterial({ color: 0x3f7d32, roughness: 1 }), trees.length);
-      trunk.receiveShadow = true; canopy.receiveShadow = true;
+      // agrupa por tipo: cada tipo con su tronco y copa propios (más realista)
+      const groups = {};
+      for (const t of trees) (groups[t[3]] = groups[t[3]] || []).push(t);
       const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new THREE.Vector3(), p = new THREE.Vector3();
-      let ti = 0;
-      const canopyCol = new THREE.Color();
-      for (const [x, h, z, kind, scale] of trees) {
-        chunk.solids.push({ x: x, z: z, r: 0.34 * scale + 0.12 });
-        const bcol = kind === "pine" ? 0x2d5a40 : kind === "dead" ? 0x4a4a40 : kind === "cinder" ? 0x7a4a2a : kind === "cactus" ? 0x3a7a4a : 0x3f8a3a;
-        q.setFromEuler(new THREE.Euler(0, rng() * Math.PI, 0));
-        s.set(scale, scale, scale);
-        p.set(x, h, z);
-        if (kind === "cactus") {
-          m4.compose(p, q, s);
-          trunk.setMatrixAt(ti, m4);
-          const body = new THREE.Matrix4();
-          const bodyGeo = new THREE.CylinderGeometry(0.42, 0.5, 3.2, 6);
-          // cactus canopy = sphere, reuse canopy mesh with matrix
-          p.set(x, h + 1.9 * scale, z);
-          s.set(scale * 1.2, scale * 1.2, scale * 1.2);
-          m4.compose(p, q, s);
-          canopyCol.setHex(0x3a7a4a);
-          canopy.setColorAt(ti, canopyCol);
-          canopy.setMatrixAt(ti, m4);
-          trunk.setColorAt(ti, canopyCol);
-          // adjust trunk height/scale for cactus: set scale y taller
-          s.set(scale * 0.9, scale * 1.15, scale * 0.9);
-          p.set(x, h + 1.6 * scale, z);
-          m4.compose(p, q, s);
-          trunk.setMatrixAt(ti, m4);
-        } else if (kind === "dead") {
-          trunk.setColorAt(ti, new THREE.Color(0x4a4a40));
-          canopy.setColorAt(ti, new THREE.Color(0x3a3a30));
-          s.set(scale, scale, scale);
-          p.set(x, h + 1.5 * scale, z);
-          m4.compose(p, q, s);
-          trunk.setMatrixAt(ti, m4);
-          p.set(x, h + 3.0 * scale, z);
-          m4.compose(p, q, s);
-          canopy.setMatrixAt(ti, m4);
-        } else {
-          canopyCol.setHex(bcol);
-          canopyCol.offsetHSL((rng2() - 0.5) * 0.05, (rng2() - 0.5) * 0.12, (rng2() - 0.5) * 0.09);
-          trunk.setColorAt(ti, new THREE.Color(0x6d4c33));
-          canopy.setColorAt(ti, canopyCol);
-          const trunkH = kind === "pine" ? 1.4 : 2.4;
-          p.set(x, h + trunkH * 0.5 * scale, z);
-          s.set(scale, trunkH * scale, scale);
-          q.setFromEuler(new THREE.Euler(0, rng() * Math.PI, 0));
-          m4.compose(p, q, s);
-          trunk.setMatrixAt(ti, m4);
-          const top = kind === "pine" ? 2.6 : 3.4;
-          p.set(x, h + top * scale, z);
-          s.set(scale * (kind === "pine" ? 0.8 : 1.35), scale * (kind === "pine" ? 1.6 : 1.15), scale * (kind === "pine" ? 0.8 : 1.35));
-          m4.compose(p, q, s);
-          canopy.setMatrixAt(ti, m4);
+      for (const kind of Object.keys(groups)) {
+        const list = groups[kind];
+        const trunkGeo = kind === "cactus" ? new THREE.CylinderGeometry(0.42, 0.5, 3.2, 6)
+          : kind === "dead" ? new THREE.CylinderGeometry(0.1, 0.24, 1, 5)
+          : new THREE.CylinderGeometry(0.2, 0.34, 1, 6);
+        const trunk = new THREE.InstancedMesh(trunkGeo, new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1 }), list.length);
+        const canopyGeo = kind === "pine" ? new THREE.ConeGeometry(1.0, 2.6, 7)
+          : new THREE.IcosahedronGeometry(kind === "dead" ? 0.7 : 1.15, 1);
+        const canopy = new THREE.InstancedMesh(canopyGeo, new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1 }), list.length);
+        const lobe = kind === "tree" || kind === "cinder"
+          ? new THREE.InstancedMesh(new THREE.IcosahedronGeometry(0.8, 1), new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1 }), list.length)
+          : null;
+        trunk.receiveShadow = true; canopy.receiveShadow = true;
+        if (lobe) lobe.receiveShadow = true;
+        let ti = 0;
+        const col = new THREE.Color();
+        for (const [x, h, z, , scale] of list) {
+          chunk.solids.push({ x: x, z: z, r: 0.34 * scale + 0.12 });
+          const rot = rng() * Math.PI;
+          q.setFromEuler(new THREE.Euler(0, rot, 0));
+          if (kind === "cactus") {
+            s.set(scale * 0.9, scale * 1.15, scale * 0.9);
+            p.set(x, h + 1.6 * scale, z);
+            m4.compose(p, q, s);
+            trunk.setMatrixAt(ti, m4);
+            trunk.setColorAt(ti, col.setHex(0x4a8a54));
+            p.set(x, h + 3.5 * scale, z);
+            s.set(scale * 0.5, scale * 0.5, scale * 0.5);
+            m4.compose(p, q, s);
+            canopy.setMatrixAt(ti, m4);
+            canopy.setColorAt(ti, col.setHex(0x3a7a4a));
+          } else if (kind === "dead") {
+            trunk.setColorAt(ti, col.setHex(0x4a4a40));
+            s.set(scale, 3 * scale, scale);
+            p.set(x, h + 1.5 * scale, z);
+            m4.compose(p, q, s);
+            trunk.setMatrixAt(ti, m4);
+            canopy.setColorAt(ti, col.setHex(0x3a3a30));
+            s.set(scale, scale, scale);
+            p.set(x, h + 3.0 * scale, z);
+            m4.compose(p, q, s);
+            canopy.setMatrixAt(ti, m4);
+          } else {
+            const bcol = kind === "pine" ? 0x2d5a40 : kind === "cinder" ? 0x7a4a2a : 0x3f8a3a;
+            trunk.setColorAt(ti, col.setHex(0x6d4c33));
+            col.setHex(bcol).offsetHSL((rng2() - 0.5) * 0.05, (rng2() - 0.5) * 0.12, (rng2() - 0.5) * 0.09);
+            canopy.setColorAt(ti, col);
+            if (lobe) {
+              col.setHex(bcol).offsetHSL((rng2() - 0.5) * 0.05, (rng2() - 0.5) * 0.1, (rng2() - 0.5) * 0.1 - 0.07);
+              lobe.setColorAt(ti, col);
+            }
+            if (kind === "pine") {
+              s.set(scale, 1.6 * scale, scale);
+              p.set(x, h + 0.8 * scale, z);
+            } else {
+              s.set(scale, 2.6 * scale, scale);
+              p.set(x, h + 1.3 * scale, z);
+            }
+            m4.compose(p, q, s);
+            trunk.setMatrixAt(ti, m4);
+            if (kind === "pine") {
+              p.set(x, h + 3.0 * scale, z);
+              s.set(scale * 0.85, scale * 1.5, scale * 0.85);
+            } else {
+              p.set(x, h + 3.5 * scale, z);
+              s.set(scale * 1.35, scale * 1.15, scale * 1.35);
+            }
+            m4.compose(p, q, s);
+            canopy.setMatrixAt(ti, m4);
+            if (lobe) {
+              const a = rng() * Math.PI * 2, off = 0.75 * scale;
+              p.set(x + Math.cos(a) * off, h + 4.35 * scale, z + Math.sin(a) * off);
+              s.set(scale * 0.9, scale * 0.8, scale * 0.9);
+              m4.compose(p, q, s);
+              lobe.setMatrixAt(ti, m4);
+            }
+          }
+          ti++;
         }
-        ti++;
+        trunk.instanceMatrix.needsUpdate = true;
+        canopy.instanceMatrix.needsUpdate = true;
+        trunk.count = ti; canopy.count = ti;
+        this.scene.add(trunk); this.scene.add(canopy);
+        chunk.foliage.push(trunk, canopy);
+        if (lobe) {
+          lobe.instanceMatrix.needsUpdate = true;
+          lobe.count = ti;
+          this.scene.add(lobe);
+          chunk.foliage.push(lobe);
+        }
       }
-      trunk.instanceMatrix.needsUpdate = true;
-      canopy.instanceMatrix.needsUpdate = true;
-      trunk.count = ti; canopy.count = ti;
-      this.scene.add(trunk); this.scene.add(canopy);
-      chunk.foliage.push(trunk, canopy);
     }
     if (rocks.length) {
       const rm = new THREE.InstancedMesh(new THREE.DodecahedronGeometry(0.8, 0), new THREE.MeshStandardMaterial({ color: 0x888d92, roughness: 1, metalness: 0 }), rocks.length);
@@ -419,18 +458,25 @@ const World = {
       chunk.rocks = rm;
     }
     if (grass.length) {
-      const gm = new THREE.InstancedMesh(new THREE.PlaneGeometry(0.5, 0.8), new THREE.MeshStandardMaterial({ color: 0x5f8f3f, side: THREE.DoubleSide, alphaTest: 0.5, roughness: 1 }), grass.length);
+      const gm = new THREE.InstancedMesh(this._grassTuftGeo(), new THREE.MeshStandardMaterial({ color: 0xffffff, side: THREE.DoubleSide, roughness: 1 }), grass.length);
       const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new THREE.Vector3(), p = new THREE.Vector3();
+      const gcol = new THREE.Color();
       let gi = 0;
-      for (const [x, h, z] of grass) {
-        q.setFromEuler(new THREE.Euler(0, rng() * Math.PI, 0));
-        s.set(0.4 + rng() * 0.5, 0.6 + rng() * 0.8, 1);
-        p.set(x, h + 0.4, z);
+      for (const [x, h, z, mul] of grass) {
+        q.setFromEuler(new THREE.Euler(0, rng() * Math.PI * 2, 0));
+        const w = (0.55 + rng() * 0.5) * mul;
+        s.set(w, (0.45 + rng() * 0.5) * mul, w);
+        p.set(x, h, z);
         m4.compose(p, q, s);
-        gm.setMatrixAt(gi++, m4);
+        gm.setMatrixAt(gi, m4);
+        gcol.setHex(0x5f8f3f).offsetHSL((rng2() - 0.5) * 0.05, (rng2() - 0.5) * 0.14, (rng2() - 0.5) * 0.1 + (mul - 1) * 0.5);
+        gm.setColorAt(gi, gcol);
+        gi++;
       }
       gm.instanceMatrix.needsUpdate = true;
+      if (gm.instanceColor) gm.instanceColor.needsUpdate = true;
       gm.count = gi;
+      gm.receiveShadow = true;
       this.scene.add(gm);
       chunk.foliage.push(gm);
     }
@@ -493,6 +539,25 @@ const World = {
       this.scene.add(bm);
       chunk.foliage.push(bm);
     }
+  },
+
+  /* mata de hierba: 5 hojas triangulares en abanico (sin textura) */
+  _grassTuftGeo() {
+    const blades = 5, pos = [], idx = [];
+    let b = 0;
+    for (let i = 0; i < blades; i++) {
+      const a = i * Math.PI * 2 / blades + 0.3;
+      const dx = Math.cos(a), dz = Math.sin(a);
+      const w = 0.06, lean = 0.22;
+      pos.push(-dz * w, 0, dx * w, dz * w, 0, -dx * w, dx * lean, 1, dz * lean);
+      idx.push(b, b + 1, b + 2);
+      b += 3;
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+    g.setIndex(idx);
+    g.computeVertexNormals();
+    return g;
   },
 
   /* ---------------------- sky / water / lights ---------------------- */

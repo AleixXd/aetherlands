@@ -576,6 +576,7 @@ const Player = {
     this.game.fx.shoot(from, dir, {
       color: colors[element] || 0xffffff, speed: speed, dmg: dmg, element: element,
       size: element === "phys" ? 0.18 : 0.4, from: "player", owner: this,
+      kind: element === "phys" ? "arrow" : undefined,
       explode: opts.explode, explodeR: opts.explodeR, pierce: opts.pierce, hitR: opts.hitR,
     });
     this.swingT = 0.16; this.swingA = 0.16;

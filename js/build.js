@@ -500,6 +500,7 @@ const Build = {
       const sry = Math.atan2(dnx, dnz);
 
       const kiosk = this.makeKiosk(n, shop);
+      kiosk.name = "kiosk";
       kiosk.position.set(sx, sy, sz);
       kiosk.rotation.y = sry; // el puesto mira al centro de la plaza
       this.scene.add(kiosk);
@@ -516,21 +517,22 @@ const Build = {
         chain.position.set(cx, 0.6, 0);
         signG.add(chain);
       }
-      signG.position.set(sx + dnx * 2.45, sy + 2.42, sz + dnz * 2.45);
+      signG.position.set(sx + dnx * 2.94, sy + 2.9, sz + dnz * 2.94);
       signG.rotation.y = sry;
       this.scene.add(signG);
 
       // NPC delante del puesto (visible y accesible)
-      const npx = sx + dnx * 3.8, npz = sz + dnz * 3.8;
+      const npx = sx + dnx * 4.56, npz = sz + dnz * 4.56;
       const nyy = World.heightAt(npx, npz);
       const npc = this.makeNPC(n, nyy + 0.1);
+      npc.name = "npc";
       npc.position.x = npx; npc.position.z = npz;
       npc.rotation.y = sry;
       this.scene.add(npc);
       this._attachNPCGLB(npc, n);
       this.npcTags.push({ x: npx, y: nyy + 2.6, z: npz, label: n.name, sub: n.title, color: n.roleColor || "#e8d8b8" });
       this.interactables.push({ id: n.id, type: "npc", x: npx, z: npz, radius: 3.6, npc: n });
-      this.colliders.push({ x: sx, z: sz, hw: 3.2, hd: 2.5, a: sry });
+      this.colliders.push({ x: sx, z: sz, hw: 3.85, hd: 3.0, a: sry });
     }
 
     // --- mobiliario de la plaza ---
@@ -716,10 +718,6 @@ const Build = {
       this.spawnTownFlag(fx, PT, fz, fx > 0 ? 0xb4374a : 0x3a6ea5);
     }
 
-    // --- marcador de aparición del jugador ---
-    const halo = this.box(3, 0.1, 3, 0x6fe0a0, { emissive: 0x2f9a6a, emissiveIntensity: 1.2, transparent: true, opacity: 0.5 });
-    halo.position.set(6, PT + 0.02, 8);
-    this.scene.add(halo);
   },
 
   /* ---------------- kiosco de mercado ---------------- */
@@ -800,6 +798,8 @@ const Build = {
       this.glbReady++;
       this._settleGoods(g, goods, root);
     });
+    // el puesto completo (modelo + mercancía) algo más grande que un personaje
+    g.scale.setScalar(1.2);
 
     // mercancía según el oficio
     const goods = new THREE.Group();
@@ -932,6 +932,7 @@ const Build = {
      La mercancía procedural va en z ±1.6: al cargar el GLB se reubica. */
   _settleGoods(g, goods, glbRoot) {
     g.updateMatrixWorld(true);
+    const inv = 1 / (g.scale.x || 1);   // el grupo escalado: medir en unidades locales
     const ray = new THREE.Raycaster();
     ray.far = 20;
     const down = new THREE.Vector3(0, -1, 0);
@@ -941,7 +942,7 @@ const Build = {
       const h = ray.intersectObject(glbRoot, true);
       return h.length ? h[0].point.y - g.position.y : null;
     };
-    const hf = surf(0, 0.55), hl = surf(-3.05, -1.2), hr = surf(3.05, -1.2);
+    const hf = surf(0, 0.55) * inv, hl = surf(-3.05, -1.2) * inv, hr = surf(3.05, -1.2) * inv;
     const slots = { l: [-1.35, -0.75], r: [-1.35, -0.75] };
     const used = { l: 0, r: 0 };
     const seen = {};
