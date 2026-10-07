@@ -22,6 +22,7 @@ const Build = {
   npcMixers: [],
   glbReady: 0,
   fountainWater: null,
+  fountainFx: null,
   _animT: 0,
 
   init(scene) {
@@ -41,6 +42,7 @@ const Build = {
     this.npcMixers = [];
     this.glbReady = 0;
     this.fountainWater = null;
+    this.fountainFx = null;
     this._animT = 0;
     this.buildTown();
     this.buildCastle();
@@ -405,36 +407,95 @@ const Build = {
       }
     }
 
-    // --- fuente octogonal con estatuilla y chorros ---
-    const fBase = this.cyl(3.5, 3.6, 1.4, 8, 0xb9c4d0, { rough: 0.5, metal: 0.15 });
-    fBase.position.set(0, 2.65, 0);
-    const fTrim = this.cyl(3.62, 3.62, 0.24, 8, 0x9aa6b5, { rough: 0.6 });
-    fTrim.position.set(0, 3.24, 0);
-    const fWater = this.cyl(3.0, 3.0, 0.14, 8, 0x4fb3e8,
+    // --- fuente octogonal de piedra: cuenca con agua visible, chorros en arco ---
+    const stoneA = 0xb9c4d0, stoneB = 0xa3adba, trimC = 0x9aa6b5;
+    const fStep = this.cyl(3.78, 3.9, 0.4, 8, stoneB, { rough: 0.9 });
+    fStep.position.set(0, 2.18, 0);
+    const wall = new THREE.Mesh(
+      new THREE.CylinderGeometry(3.5, 3.6, 1.0, 8, 1, true), this.mat(stoneA, { rough: 0.85, side: THREE.DoubleSide }));
+    wall.position.set(0, 2.88, 0);
+    wall.castShadow = true; wall.receiveShadow = true;
+    const fFloor = this.cyl(3.5, 3.5, 0.58, 8, 0x4a6b7d, { rough: 1 }); // piedra mojada bajo el agua
+    fFloor.position.set(0, 2.77, 0);
+    const fWater = this.cyl(3.25, 3.25, 0.14, 8, 0x4fb3e8,
       { emissive: 0x1d7ab0, emissiveIntensity: 0.5, transparent: true, opacity: 0.92, rough: 0.2 });
     fWater.position.set(0, 3.14, 0);
-    fWater.castShadow = false;
-    const fCol = this.cyl(0.7, 0.95, 1.7, 8, 0xd7d7d7, { rough: 0.35 });
-    fCol.position.set(0, 4.0, 0);
-    const fBowl = this.cyl(1.35, 0.85, 0.5, 8, 0xd7d7d7, { rough: 0.35 });
-    fBowl.position.set(0, 5.05, 0);
-    const fTop = this.sph(0.34, 0xe8e8e8, { rough: 0.3 });
-    fTop.position.set(0, 5.6, 0);
-    this.scene.add(fBase, fTrim, fWater, fCol, fBowl, fTop);
-    // chorros del cuenco superior + chorro central
-    const streamMat = this.mat(0x7fd0f4, { emissive: 0x2f8fc0, emissiveIntensity: 0.6, transparent: true, opacity: 0.75 });
+    fWater.castShadow = false; fWater.receiveShadow = false;
+    this.scene.add(fStep, wall, fFloor, fWater);
+    // anillo de 8 sillares como borde (juntas visibles, tono variado)
+    const blockTones = [0.03, -0.02, 0.04, -0.03, 0.01, -0.04, 0.02, 0];
+    for (let i = 0; i < 8; i++) {
+      const a = i / 8 * Math.PI * 2;
+      const c = new THREE.Color(stoneA).offsetHSL(0, 0, blockTones[i]);
+      const blk = this.box(2.9, 0.26, 0.55, c.getHex(), { rough: 0.88 });
+      blk.position.set(Math.cos(a) * 3.48, 3.51, Math.sin(a) * 3.48);
+      blk.rotation.y = -a + Math.PI / 2;
+      this.scene.add(blk);
+    }
+    // pie, columna y taza superior
+    const fFoot = this.cyl(0.9, 1.1, 0.4, 8, stoneB, { rough: 0.9 });
+    fFoot.position.set(0, 3.26, 0);
+    const fCol = this.cyl(0.7, 0.95, 1.7, 8, stoneA, { rough: 0.5 });
+    fCol.position.set(0, 4.31, 0);
+    const bowlWall = new THREE.Mesh(
+      new THREE.CylinderGeometry(1.45, 0.85, 0.52, 8, 1, true), this.mat(stoneA, { rough: 0.5, side: THREE.DoubleSide }));
+    bowlWall.position.set(0, 5.36, 0);
+    bowlWall.castShadow = true; bowlWall.receiveShadow = true;
+    const bowlFloor = this.cyl(0.85, 0.85, 0.1, 8, 0x4a6b7d, { rough: 1 });
+    bowlFloor.position.set(0, 5.15, 0);
+    const fBowl = this.cyl(1.3, 1.3, 0.05, 8, 0x4fb3e8,
+      { emissive: 0x1d7ab0, emissiveIntensity: 0.5, transparent: true, opacity: 0.92, rough: 0.2 });
+    fBowl.position.set(0, 5.5, 0);
+    fBowl.castShadow = false; fBowl.receiveShadow = false;
+    this.scene.add(fFoot, fCol, bowlWall, bowlFloor, fBowl);
+    for (let i = 0; i < 8; i++) {
+      const a = i / 8 * Math.PI * 2;
+      const c = new THREE.Color(stoneA).offsetHSL(0, 0, blockTones[i] * 0.7);
+      const lip = this.box(1.22, 0.18, 0.35, c.getHex(), { rough: 0.6 });
+      lip.position.set(Math.cos(a) * 1.47, 5.64, Math.sin(a) * 1.47);
+      lip.rotation.y = -a + Math.PI / 2;
+      this.scene.add(lip);
+    }
+    // chorros: 4 arcos desde la taza hasta la cuenca + chorro central
+    const streamMat = this.mat(0x7fd0f4,
+      { emissive: 0x2f8fc0, emissiveIntensity: 0.6, transparent: true, opacity: 0.75, rough: 0.2, depthWrite: false });
+    const foamMat = this.mat(0xeef7ff, { transparent: true, opacity: 0.5, rough: 1, depthWrite: false });
+    const ripples = [], foam = [];
     for (let i = 0; i < 4; i++) {
       const a = i / 4 * Math.PI * 2 + Math.PI / 4;
-      const st = new THREE.Mesh(new THREE.BoxGeometry(0.1, 1.6, 0.1), streamMat);
-      st.position.set(Math.cos(a) * 1.15, 4.15, Math.sin(a) * 1.15);
+      const ca = Math.cos(a), sa = Math.sin(a);
+      const curve = new THREE.QuadraticBezierCurve3(
+        new THREE.Vector3(ca * 1.3, 5.52, sa * 1.3),
+        new THREE.Vector3(ca * 2.3, 5.85, sa * 2.3),
+        new THREE.Vector3(ca * 2.88, 3.17, sa * 2.88));
+      const st = new THREE.Mesh(new THREE.TubeGeometry(curve, 14, 0.05, 5, false), streamMat);
       st.castShadow = false;
       this.scene.add(st);
+      const fd = new THREE.Mesh(new THREE.CircleGeometry(0.3, 12), foamMat);
+      fd.rotation.x = -Math.PI / 2;
+      fd.position.set(ca * 2.88, 3.26, sa * 2.88);
+      fd.castShadow = false;
+      this.scene.add(fd);
+      foam.push(fd);
+      const rg = new THREE.Mesh(new THREE.RingGeometry(0.75, 0.88, 20),
+        this.mat(0xd8f2ff, { transparent: true, opacity: 0.5, rough: 1, depthWrite: false }));
+      rg.rotation.x = -Math.PI / 2;
+      rg.position.set(ca * 2.88, 3.245, sa * 2.88);
+      rg.castShadow = false;
+      this.scene.add(rg);
+      ripples.push({ mesh: rg, ph: i * 0.25 });
     }
-    const jet = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.1, 0.9, 6), streamMat);
-    jet.position.set(0, 6.15, 0);
-    this.scene.add(jet);
+    const jet = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.08, 1.1, 6), streamMat);
+    jet.position.set(0, 6.07, 0);
+    jet.castShadow = false;
+    const jetFoam = this.sph(0.13, 0xeef7ff, { transparent: true, opacity: 0.5, rough: 1, depthWrite: false });
+    jetFoam.position.set(0, 6.66, 0);
+    jetFoam.castShadow = false;
+    this.scene.add(jet, jetFoam);
+    foam.push(jetFoam);
     this.fountainWater = fWater;
-    this.colliders.push({ x: 0, z: 0, hw: 3.5, hd: 3.5, a: 0 });
+    this.fountainFx = { water: fWater, bowlWater: fBowl, streamMat: streamMat, foamMat: foamMat, ripples: ripples };
+    this.colliders.push({ x: 0, z: 0, hw: 3.75, hd: 3.75, a: 0 });
 
     // --- casas del pueblo (modelos KayKit con fallback procedural) ---
     const townHouses = [
@@ -1412,10 +1473,19 @@ const Build = {
       f.mat.emissiveIntensity = f.base + Math.sin(t * 17 + f.ph) * 0.9;
     }
 
-    // agua de la fuente
-    if (this.fountainWater) {
-      this.fountainWater.material.emissiveIntensity = 0.45 + Math.sin(t * 2.2) * 0.18;
-      this.fountainWater.position.y = 3.14 + Math.sin(t * 1.7) * 0.02;
+    // agua de la fuente: oleaje, ondas expansivas y espuma
+    const fxf = this.fountainFx;
+    if (fxf) {
+      fxf.water.material.emissiveIntensity = 0.45 + Math.sin(t * 2.2) * 0.18;
+      fxf.water.position.y = 3.14 + Math.sin(t * 1.7) * 0.02;
+      fxf.bowlWater.position.y = 5.5 + Math.sin(t * 1.7 + 0.5) * 0.012;
+      fxf.streamMat.opacity = 0.66 + Math.sin(t * 6.5) * 0.13;
+      fxf.foamMat.opacity = 0.42 + Math.sin(t * 4.3) * 0.15;
+      for (const rp of fxf.ripples) {
+        const u = (t * 0.5 + rp.ph) % 1;
+        rp.mesh.scale.setScalar(0.3 + u * 1.5);
+        rp.mesh.material.opacity = 0.5 * (1 - u);
+      }
     }
 
     // lámparas: brillan de noche
