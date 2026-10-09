@@ -235,6 +235,10 @@ const Game = {
 
     const bn = document.getElementById("boot-note");
     if (bn) bn.classList.add("hidden");
+
+    // multijugador opcional (Supabase Realtime): si la red falla, el juego sigue igual
+    if (typeof Net !== "undefined") { try { Net.boot(); } catch (e) { console.warn("[Net]", e.message); } }
+
     window.__gameReady = true;
 
     this.regionVisuals();
@@ -394,6 +398,9 @@ const Game = {
     // fx
     this.fx.update(dt, this);
     if (this.build && this.build.update) this.build.update(dt, this.player.pos);
+
+    // multijugador: interpolación de los jugadores remotos
+    if (typeof Net !== "undefined") Net.update(dt);
 
     // consagración (paladín)
     if (this.player.buffs.consecUntil > this.time) this.player.heal(14 * dt);

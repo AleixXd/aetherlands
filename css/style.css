@@ -392,6 +392,8 @@ body.in-menu #hud, body.in-menu #minimap-wrap, body.in-menu #interact-hint { dis
 .nameplate b { color: #ffe9b0; font-weight: 700; letter-spacing: 1px; font-family: var(--serif); }
 .nameplate small { display: block; color: #9fb4d8; font-size: 10px; letter-spacing: 1px; }
 .nameplate.village b { color: var(--gold); font-size: 14px; }
+.nameplate.player b { color: #7fe3ff; text-shadow: 0 0 6px rgba(80, 190, 255, .55); }
+.nameplate.player small { color: #a8e8ff; }
 
 /* ---------- pista de interacción ---------- */
 #interact-hint {

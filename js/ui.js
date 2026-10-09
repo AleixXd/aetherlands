@@ -1204,8 +1204,14 @@ const UI = {
   updateNameplates() {
     const box = this.els.nameplates;
     if (!box) return;
-    const tags = (typeof Build !== "undefined" && Build.npcTags) ? Build.npcTags : [];
-    const show = this.game.region === "overworld" && tags.length > 0;
+    let tags = [];
+    if (this.game.region === "overworld" && typeof Build !== "undefined" && Build.npcTags) tags = Build.npcTags;
+    // jugadores remotos (multijugador): se añaden encima de los tags del mundo
+    if (typeof Net !== "undefined" && Net.plates) {
+      const pl = Net.plates();
+      if (pl.length) tags = tags.concat(pl);
+    }
+    const show = tags.length > 0;
     while (this._npEls.length < tags.length) {
       const d = document.createElement("div");
       d.className = "nameplate";
@@ -1224,7 +1230,7 @@ const UI = {
         if (d2 > maxD * maxD) continue;
         const v = new THREE.Vector3(t.x, t.y, t.z).project(cam);
         if (v.z > 1 || Math.abs(v.x) > 1.15 || Math.abs(v.y) > 1.15) continue;
-        cand.push({ i: i, t: t, x: (v.x * 0.5 + 0.5) * innerWidth, y: (-v.y * 0.5 + 0.5) * innerHeight, d2: d2, p: isNpc ? 0 : 1 });
+        cand.push({ i: i, t: t, x: (v.x * 0.5 + 0.5) * innerWidth, y: (-v.y * 0.5 + 0.5) * innerHeight, d2: d2, p: t.pl ? -1 : (isNpc ? 0 : 1) });
       }
       cand.sort((a, b) => (a.p - b.p) || (a.d2 - b.d2));
     }
@@ -1247,6 +1253,7 @@ const UI = {
         el.innerHTML = "<b>" + t.label + "</b>" + (t.sub ? "<small>" + t.sub + "</small>" : "");
         el._label = t.label;
         el.classList.toggle("village", !t.sub);
+        el.classList.toggle("player", !!t.pl);
       }
       let x = 0, y = 0;
       for (const p of placed) if (p.i === i) { x = p.x; y = p.y; break; }
