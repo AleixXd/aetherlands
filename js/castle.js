@@ -59,7 +59,12 @@ const Castle = {
     this.buildFloor();
     this.spawnEnemies();
     Game.onRegionEnter();
-    Game.notify("Piso " + f + " — " + this.theme.name, "info");
+    if (this.isFinalFloor() && !Save.data.castle.crowned) {
+      Game.notify("Piso 100 — Cumbre de la Aguja. El último guardián te espera.", "warn");
+      Game.fx.pillar(new THREE.Vector3(0, 0, 0), 0xb45aff, 26, 1.8, 1.2);
+    } else {
+      Game.notify("Piso " + f + " — " + this.theme.name, "info");
+    }
     Game.sfx.spell();
     Save.save();
   },
@@ -102,7 +107,12 @@ const Castle = {
           if (this.canEnter(this.floor + 1)) this.enter(this.floor + 1);
           else Game.notify("Necesitas nivel " + this.requiredLevel(this.floor + 1) + " para el piso " + (this.floor + 1) + ".", "warn");
         }
-        else { this.exit(); }
+        else {
+          if (Save.data.castle.crowned) {
+            Game.notify("La Aguja ya es tuya. ¡Sal de la cumbre!", "info");
+          }
+          this.exit();
+        }
       } else {
         Game.notify("Primero limpia el piso (y al guardián).", "warn");
       }
@@ -124,7 +134,7 @@ const Castle = {
     if (Utils.dist2(x, z, 0, W / 2 - 4) < 4 * 4) {
       if (this.floorCleared() && (this.floor % 10 !== 0 || (this.boss && this.boss.dead) || !this.boss)) {
         if (this.floor < this.maxFloor) return "Subir al piso " + (this.floor + 1);
-        return "Salir de la Aguja";
+        return Save.data.castle.crowned ? "Bajar de la Aguja coronada" : "Salir de la Aguja";
       }
       return "Portal sellado — limpia el piso";
     }
@@ -291,18 +301,24 @@ const Castle = {
     const tier = Math.floor((f - 1) / 25);
     const names = ["Guardián de Piedra", "Guardián Carmesí", "Guardián del Vacío", "Señor de la Aguja"];
     const colors = [0x8d9a7a, 0xbf6a6a, 0x9a5ac8, 0xd8d8b0];
-    const color = colors[Math.min(3, tier)];
+    const final = this.isFinalFloor();
+    const color = final ? 0xc0392b : colors[Math.min(3, tier)];
     const lvl = this.requiredLevel(f);
     const en = this.game.enemyDirector.spawnBoss({ x: 0, z: 0, y: 0 }, {
-      name: names[Math.min(3, tier)] + " · " + this.theme.name,
-      level: lvl, hp: Math.round(1400 + f * 380), atk: Math.round(26 + f * 6),
+      name: final ? "El Señor de la Aguja · Guardián de la Obsidiana" : names[Math.min(3, tier)] + " · " + this.theme.name,
+      level: lvl, hp: Math.round(1400 + f * 380) * (final ? 2.2 : 1), atk: Math.round(26 + f * 6),
       def: Math.round(10 + f), mdef: Math.round(8 + f), xp: Math.round(80 + f * 12),
       gold: Math.round(CFG.CASTLE.CLEAR_REWARD_GOLD + f * 2),
+      model: final ? "demon" : undefined, size: final ? 6.5 : undefined,
+      color: color,
+      pattern: final ? ["charge", "meteor", "fury", "summon"] : ["charge"],
     });
     en.def.type = "boss"; en.def.color = color;
     en.userData.castleWarden = true;
     this.boss = en; this.bossPresent = true;
   },
+
+  isFinalFloor() { return this.floor === this.maxFloor; },
 
   onEnemyDefeated(e) {
     for (let i = this.enemies.length - 1; i >= 0; i--) {
@@ -317,6 +333,7 @@ const Castle = {
       Game.sfx.roar();
       Game.addGold(CFG.CASTLE.CLEAR_REWARD_GOLD + this.floor * 2);
       Game.notify("¡Guardián derrotado! +" + (CFG.CASTLE.CLEAR_REWARD_GOLD + this.floor * 2) + " de oro", "good");
+      if (this.isFinalFloor()) this._crownTower();
       QuestManager.onCastleFloor(this.floor);
       Save.save();
     } else if (this.enemies.length === 0) {
@@ -330,6 +347,38 @@ const Castle = {
     const sv = Save.data.castle;
     if (this.floor > sv.highestFloor) sv.highestFloor = this.floor;
     if (sv.cleared.indexOf(this.floor) < 0) sv.cleared.push(this.floor);
+  },
+
+  /* coronar la Aguja: jefe final + arma de la corona (una sola vez) */
+  _crownTower() {
+    const sv = Save.data.castle;
+    if (sv.crowned) {
+      // ya coronada: solo el mensaje, sin repetir el botín
+      Game.notify("El Señor de la Aguja vuelve a caer. La corona ya es tuya.", "good");
+      Save.save();
+      return;
+    }
+    const GOLD = 50000;
+    Game.addGold(GOLD);
+    if (typeof Inventory !== "undefined") Inventory.add("crystal", 5);
+    const cls = (Save.data.player.classId || "warrior");
+    const sub = (typeof CLASSES !== "undefined" && CLASSES[cls]) ? CLASSES[cls].weapon : "sword";
+    const wid = "w_crown_" + sub;
+    let weapon = null;
+    if (ITEM.defs[wid] && typeof Inventory !== "undefined") {
+      Inventory.add(wid, 1, true);
+      weapon = wid;
+    }
+    sv.crowned = true;
+    const name = weapon ? ITEM.defs[weapon].name : "la corona de la Aguja";
+    Game.fx.shockwave(new THREE.Vector3(0, 1, 0), 0xffb020, 40, 1.8);
+    Game.fx.pillar(new THREE.Vector3(0, 0, 0), 0xffb020, 40, 2.6, 2.0);
+    Game.fx.burst(new THREE.Vector3(0, 3, 0), 0xffb020, 60, { speedMin: 6, speedMax: 18 });
+    Game.notify("¡La Aguja es tuya! El Señor de la Aguja ha caído.", "good");
+    if (Game.ui && Game.ui.notify) {
+      Game.ui.notify("CORONACIÓN +" + GOLD + " oro, 5 cristales estelares y " + name + ".", "good");
+    }
+    Save.save();
   },
 
   resetFloor() {

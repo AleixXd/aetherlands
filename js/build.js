@@ -1139,6 +1139,19 @@ const Build = {
       this.colliders.push({ x: sx * 3.4, z: -96 + 17.6, r: 0.6 });
     }
     this.colliders.push({ x: 0, z: -96, hw: 17, hd: 17, a: 0 });
+    // estandarte carmesí si el jugador ya coronó la Aguja (marca permanente)
+    if (Save.data.castle && Save.data.castle.crowned) {
+      const mast = this.cyl(0.22, 0.28, 12, 8, 0x3a2c1c, { rough: 0.9 });
+      mast.position.set(0, y0 + 6, 17.5);
+      const bannerPivot = new THREE.Group();
+      bannerPivot.position.set(0, y0 + 11, 17.5);
+      const banner = this.box(6.4, 3.2, 0.16, 0x9b1c2e, { rough: 0.8, emissive: 0x3a0810, emissiveIntensity: 0.6 });
+      banner.position.x = -3.4;
+      bannerPivot.add(banner);
+      g.add(mast, bannerPivot);
+      this.flags.push({ pivot: bannerPivot, ph: 1.1, spd: 1.3 });
+      this.colliders.push({ x: 0, z: -96 + 17.5, r: 0.4 });
+    }
     // el cuerpo de la torre va en el yacimiento del castillo (z=-96),
     // junto a puerta/plataforma/interactable (coordenadas ya relativas a g)
     g.position.set(0, 0, -96);

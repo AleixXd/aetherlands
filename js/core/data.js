@@ -160,6 +160,24 @@ function materialDefs() {
   ITEM.def("shard_raw", { type: ItemType.MATERIAL, name: "Fragmento en bruto", icon: "\uD83D\uDD2E", color: "#ffd180", tier: "rare", value: 65 });
 }
 
+// ---------- Armas de la corona (recompensa unica del piso 100) ----------
+function crownWeaponDefs() {
+  const lines = {
+    sword: { icon: "\u2694", name: "Veranth, la Aguja Rota" },
+    staff: { icon: "\u26E8", name: "Vara de las Mil Pisadas" },
+    bow: { icon: "\uD83C\uDFF9", name: "Arco del Senor de la Aguja" },
+    scepter: { icon: "\u2698", name: "Cetro de la Obsidiana" },
+  };
+  for (const w in lines) {
+    const b = lines[w];
+    ITEM.def("w_crown_" + w, {
+      type: ItemType.WEAPON, sub: w, name: b.name, icon: b.icon,
+      tier: "legendary", color: "#ffb020", atk: 58, matk: 44, lvl: 1, cost: 0,
+      desc: "Se forjo en la cima de la Aguja al vencer al Senor de la Aguja.",
+    });
+  }
+}
+
 // ---------- Monturas ----------
 function mountDefs() {
   ITEM.def("mount_stag", { type: ItemType.MOUNT, name: "Ciervo del bosque", icon: "\uD83E\uDD8C", color: "#8d6e63", tier: "rare", speed: 1.0, gachaRate: 0.16, cost: 800 });
@@ -357,7 +375,8 @@ function tierCaps(tr) { return TierNames[tr] || (tr.charAt(0).toUpperCase() + tr
 
 // Construye todas las definiciones al cargar
 weaponDefs();
-armorDefs();
+  crownWeaponDefs();
+  armorDefs();
 potionDefs();
 materialDefs();
 mountDefs();

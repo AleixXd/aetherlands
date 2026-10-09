@@ -32,7 +32,7 @@ const Save = {
       quests: { active: [], completed: [] },
       gacha: { spins: 0, pity: 0, rolls: [] },
       mounts: { owned: [], active: -1 },
-      castle: { highestFloor: 0, cleared: [], floorResets: {} },
+      castle: { highestFloor: 0, cleared: [], floorResets: {}, crowned: false },
       world: { bossesDefeated: [], raids: [], ores: {}, enemiesKilled: 0, chestsOpened: [] },
       mining: { xp: 0 },
       settings: { quality: CFG.QUALITY.DEFAULT, sfx: true, vol: 0.5, sound: true, fx: true, shadows: true, sens: 1 },
