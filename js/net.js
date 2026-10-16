@@ -14,6 +14,7 @@ const Net = {
   TIMEOUT: 7000,    // ms sin noticias → el remoto desaparece
   MAX: 24,          // tope de jugadores simultáneos en pantalla
   TICK_MS: 200,     // cadencia del emisor (1000/HZ)
+  MAXNAME: 16,      // longitud máxima del nombre de usuario
 
   state: "off",     // off | connecting | on | error
   players: new Map(), // id → remoto { id, name, cls, lvl, r, pos, tgt, ... }
@@ -75,6 +76,23 @@ const Net = {
       }
       return pl.name;
     } catch (e) { return "Héroe"; }
+  },
+
+  /* nombre de usuario: sanea, guarda y el próximo tick lo emite */
+  sanitizeName(v) {
+    return String(v == null ? "" : v)
+      .replace(/[\u0000-\u001f\u007f]/g, "")
+      .replace(/\s+/g, " ")
+      .trim()
+      .slice(0, this.MAXNAME);
+  },
+
+  setName(v) {
+    const n = this.sanitizeName(v);
+    try {
+      if (Save.data) { Save.data.player.name = n; Save.save(); }
+    } catch (e) {}
+    return n;
   },
 
   /* ---------------- arranque ---------------- */

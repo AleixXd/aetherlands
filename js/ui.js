@@ -358,7 +358,13 @@ const UI = {
     };
     const qbtn = (v, label) =>
       '<button data-act="set-quality" data-v="' + v + '" class="setbtn' + (s.quality === v ? " on" : "") + '">' + label + "</button>";
+    const esc = (t) => String(t == null ? "" : t).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+    const curName = (typeof Net !== "undefined" && Net.sanitizeName) ?
+      Net.sanitizeName(Save.data && Save.data.player && Save.data.player.name) :
+      ((Save.data && Save.data.player && Save.data.player.name) || "");
     el.innerHTML =
+      '<div class="setrow"><span>Nombre en línea</span>' +
+      '<input type="text" id="set-name" class="setname" maxlength="16" spellcheck="false" autocomplete="off" placeholder="Automático" value="' + esc(curName) + '"></div>' +
       tog("sound", "Sonido") +
       rng("vol", "Volumen", 0, 100, 5) +
       rng("sens", "Sensibilidad del ratón", 30, 200, 10) +
@@ -379,6 +385,23 @@ const UI = {
         if (lbl) lbl.textContent = Math.round(val) + "%";
       });
     });
+    const nameEl = el.querySelector("#set-name");
+    if (nameEl) {
+      const saveName = (normalize) => {
+        const v = (typeof Net !== "undefined" && Net.setName) ? Net.setName(nameEl.value) : "";
+        if (normalize) nameEl.value = v;
+        return v;
+      };
+      nameEl.addEventListener("input", () => saveName(false));
+      nameEl.addEventListener("change", () => {
+        const v = saveName(true);
+        this.notify(v ? "Nombre: " + v : "Nombre automático activado.", "good");
+      });
+      nameEl.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") { nameEl.blur(); e.preventDefault(); }
+        e.stopPropagation();
+      });
+    }
   },
 
   /* ---------- stats ---------- */

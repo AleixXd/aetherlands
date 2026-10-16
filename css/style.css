@@ -478,6 +478,13 @@ body.in-menu #hud, body.in-menu #minimap-wrap, body.in-menu #interact-hint { dis
 .setrow { display: flex; align-items: center; gap: 10px; padding: 9px 4px; border-bottom: 1px solid rgba(255,255,255,0.06); font-size: 13px; }
 .setrow span { flex: 1; color: #a3a9b8; }
 .setrow b { color: var(--gold-lt); font-weight: 600; min-width: 46px; text-align: right; font-size: 12px; }
+.setrow input.setname {
+  flex: 1.4; min-width: 0; padding: 7px 10px;
+  background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.14);
+  border-radius: 6px; color: #e8ecf5; font-size: 13px; outline: none; font-family: inherit;
+}
+.setrow input.setname:focus { border-color: var(--gold); }
+.setrow input.setname::placeholder { color: #7b8194; }
 .setbtn {
   cursor: pointer; border: 1px solid rgba(217,179,106,0.3); background: rgba(38,32,54,0.9);
   color: #d9d2bf; padding: 6px 13px; border-radius: 5px; font-size: 12px; font-weight: 700;

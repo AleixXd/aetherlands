@@ -138,6 +138,7 @@
               }
               if (missing.length === 0 || tries >= 120) {
                 clearInterval(iv);
+                if (done) { resolve(); return; }
                 done = true;
                 T("pwa: service worker", true, "");
                 T("pwa: cache completa", missing.length === 0,
@@ -279,6 +280,16 @@
       Net.update(0.016);
       T("net: caducidad", !Net.players.has("__ua__") && p.g && p.g.parent === null, "");
       T("net: placas limpias", Net.plates().every(function (t) { return t.label !== "Prueba UA"; }), "");
+
+      // nombre de usuario editable: sanea, limita y guarda
+      var oldName = Save.data.player.name;
+      var n1 = Net.setName("  Héroe de  Prueba  ");
+      T("net: nombre editable", n1 === "Héroe de Prueba" && Save.data.player.name === "Héroe de Prueba", n1);
+      var n2 = Net.setName(Array(40).join("X") + "!");
+      T("net: nombre limite", n2.length === 16 && Save.data.player.name === n2, "len=" + n2.length);
+      T("net: nombre caracteres", Net.setName("a\u0000b\nc") === "abc", Net.setName("a\u0000b\nc"));
+      Save.data.player.name = oldName || "";
+      Save.save();
     } catch (e) { T("net", false, e.message); }
   }
 
