@@ -24,7 +24,7 @@ try {
 } catch { $ips = @() }
 
 Write-Host ""
-Write-Host "=== Aetherlands - servidor local ===" -ForegroundColor Cyan
+Write-Host "=== Forest Legends - servidor local ===" -ForegroundColor Cyan
 Write-Host "Carpeta: $root"
 foreach ($ip in $ips) { Write-Host "  http://$($ip.IPAddressToString):$port" -ForegroundColor Green }
 Write-Host "  http://localhost:$port" -ForegroundColor Green

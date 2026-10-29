@@ -9,7 +9,7 @@
    Requiere: CFG, THREE, Utils, GLBCache, Save.
    ============================================================ */
 const Net = {
-  TOPIC: "realtime:aetherlands",
+  TOPIC: "realtime:forestlegends",
   HZ: 5,            // envíos por segundo
   TIMEOUT: 7000,    // ms sin noticias → el remoto desaparece
   MAX: 24,          // tope de jugadores simultáneos en pantalla

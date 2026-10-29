@@ -1,5 +1,5 @@
-/* Aetherlands — Service Worker: offline + actualización en segundo plano */
-const CACHE = "aetherlands-v6";
+/* Forest Legends — Service Worker: offline + actualización en segundo plano */
+const CACHE = "forestlegends-v7";
 const FILES = [
   "./",
   "./index.html",

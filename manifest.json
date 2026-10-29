@@ -1,8 +1,8 @@
 {
-  "name": "AERH — Aetherlands: El auge de la Aguja de Veranth",
-  "short_name": "AERH",
+  "name": "Forest Legends: El auge de la Aguja de Veranth",
+  "short_name": "FL",
   "lang": "es",
-  "description": "RPG 3D de mundo abierto en el navegador: explora Aetherlands, sube de nivel, completa misiones y encara jefes, mazmorras y arenas.",
+  "description": "RPG 3D de mundo abierto en el navegador: explora Forest Legends, sube de nivel, completa misiones y encara jefes, mazmorras y arenas.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

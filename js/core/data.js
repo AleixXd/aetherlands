@@ -292,7 +292,7 @@ const QUEST_TEMPLATES = [
   { id: "q_gacha", name: "La prueba del altar", giver: "Sylas", type: "gacha", target: 1, count: 1, lvl: 4,
     reward: { gold: 200, items: ["crystal"] }, desc: "Gira el Altar del Gacha una vez para demostrar que la fortuna te favorece." },
   { id: "q_mount", name: "Jinete coronado", giver: "Branwen", type: "mount", target: 1, count: 1, lvl: 10,
-    reward: { gold: 300, items: [] }, desc: "Consigue una montura y cabalga por Éterlands." },
+    reward: { gold: 300, items: [] }, desc: "Consigue una montura y cabalga por Forest Legends." },
   { id: "q_mining10", name: "Vetas de Veranth", giver: "Torvald", type: "mine", target: "mine", count: 10, lvl: 3,
     reward: { gold: 450, items: ["ore_iron"] }, desc: "Extrae 10 depósitos de mineral en cualquier lugar del reino." },
   { id: "q_boss_ashtyrant", name: "Corona de cenizas", giver: "Kralynn", type: "boss", target: "ashtyrant", count: 1, lvl: 36,

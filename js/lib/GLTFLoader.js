@@ -1,4 +1,4 @@
-/* Parche Aetherlands: se usa el THREE global (build UMD) en vez del import ESM,
+/* Parche Forest Legends: se usa el THREE global (build UMD) en vez del import ESM,
    para no tener dos instancias de three.js en la misma página. */
 const {
 	AnimationClip,

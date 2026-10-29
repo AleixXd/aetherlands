@@ -1,4 +1,4 @@
-/* tests/probe.js — suite de regresión de Aetherlands.
+/* tests/probe.js — suite de regresión de Forest Legends.
    Se inyecta en una copia temporal de index.html por tests/run.ps1.
    Emite líneas de consola "[TEST] PASS|FAIL nombre :: detalle" y "[TEST] FIN". */
 (function () {
@@ -162,7 +162,7 @@
     if (location.search.indexOf("nocloud") >= 0) return Promise.resolve();
     if (typeof CloudSave === "undefined") { T("nube: cloud.js", false, "no existe"); return Promise.resolve(); }
     if (!CloudSave.enabled()) { T("nube: configurada", false, "CFG.CLOUD vacio"); return Promise.resolve(); }
-    var em = "autotest@aetherlands.test", pw = "AeTest!2345";
+    var em = "autotest@forestlegends.test", pw = "AeTest!2345";
     return CloudSave.login(em, pw)
       .then(function () { T("nube: login", !!CloudSave.session, ""); return CloudSave.upload(JSON.stringify({ player: { gold: 4242, name: "TEST" } })); })
       .then(function () { T("nube: subida", true, ""); return CloudSave.download(); })

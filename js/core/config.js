@@ -1,5 +1,5 @@
 /* ============================================================
-   AEL — Aetherlands: A browser 3D RPG
+   FL — Forest Legends: A browser 3D RPG
    config.js — global constants and tuning
    ============================================================ */
 const CFG = {

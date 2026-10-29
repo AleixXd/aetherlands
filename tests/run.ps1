@@ -1,4 +1,4 @@
-# tests/run.ps1 — suite de regresion de Aetherlands (sin dependencias: solo Chrome + PowerShell)
+# tests/run.ps1 — suite de regresion de Forest Legends (sin dependencias: solo Chrome + PowerShell)
 # Uso:  powershell -ExecutionPolicy Bypass -File tests\run.ps1
 # Exit 0 = todo OK · Exit 1 = hay fallos · Exit 2 = entorno roto
 param([int]$Port = 8941, [int]$WaitSec = 180)
@@ -14,7 +14,7 @@ function Check([string]$name, [bool]$ok, [string]$detail = "") {
   else { Write-Host "  FAIL  $name  $detail" -ForegroundColor Red; $script:fail = $true }
 }
 
-Write-Host "=== Aetherlands · tests ===" -ForegroundColor Cyan
+Write-Host "=== Forest Legends · tests ===" -ForegroundColor Cyan
 
 # ---------- 1) estructura ----------
 Write-Host "[1/4] estructura" -ForegroundColor Yellow

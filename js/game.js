@@ -1,5 +1,5 @@
 /* ============================================================
-   game.js — Aetherlands: la saga del Aetherbound
+   game.js — Forest Legends: la saga del Aetherbound
    Orquestador maestro: renderer/cámara/escena, bucle principal,
    regiones, pegamento de combate, interacción, progresión,
    guardado y conexión con la UI.
@@ -732,7 +732,7 @@ const Game = {
         const idx = Inventory._findIndexByUid(item.uid);
         Inventory.equip(idx);
       }
-      this.notify("Bienvenido a Éterlands, " + cls.name + ".", "good");
+      this.notify("Bienvenido a Forest Legends, " + cls.name + ".", "good");
     } else {
       this.notify("Clase: " + cls.name, "info");
     }
